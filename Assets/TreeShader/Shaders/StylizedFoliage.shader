@@ -8,8 +8,8 @@ Shader "Meganeura/Stylized Foliage"
         _AlphaClipThreshold ("Alpha Clip Threshold", Range(0,1)) = 0.5
         _StylizedNormalStrength ("Stylized Normal Strength", Range(0,1)) = 0
         _CanopyCenterOffset ("Canopy Center (Object Space)", Vector) = (0,0,0,0)
-        _NormalNoiseStrength ("Normal Noise Strength", Range(0,1)) = 0.3
-        _NormalNoiseScale ("Normal Noise Scale", Range(0.1,4)) = 0.65
+        _NormalNoiseStrength ("Normal Noise Strength", Range(0,1)) = 0.18
+        _NormalNoiseScale ("Normal Noise Scale", Range(0.1,4)) = 0.75
         _ShadowThreshold ("Shadow Threshold", Range(0,1)) = 0.5
         _ShadowSoftness ("Shadow Softness", Range(0,1)) = 0.5
         _ShadowStrength ("Shadow Strength (Stops)", Range(0,4)) = 0.7
@@ -24,8 +24,8 @@ Shader "Meganeura/Stylized Foliage"
         _AOStrength ("AO Strength", Range(0,1)) = 0.35
         _HeightDarkening ("Height Darkening", Range(0,1)) = 0.15
         _HeightGradientPosition ("Height Gradient Position", Range(-1,1)) = -0.05
-        _ColorVariationStrength ("Color Variation Strength", Range(0,1)) = 0.35
-        _ColorVariationScale ("Color Variation Scale", Range(0.1,4)) = 1.1
+        _ColorVariationStrength ("Color Variation Strength", Range(0,1)) = 0.18
+        _ColorVariationScale ("Color Variation Scale", Range(0.1,4)) = 0.9
     }
 
     SubShader
@@ -140,11 +140,13 @@ Shader "Meganeura/Stylized Foliage"
                 ValueNoise3D(noisePosition + float3(11.7, 3.1, 7.9)),
                 ValueNoise3D(noisePosition + float3(2.3, 17.1, 5.4)),
                 ValueNoise3D(noisePosition + float3(6.2, 9.8, 19.3))) - 0.5;
-            // Tangential noise subtly deforms the spherical direction without
-            // pulling the canopy lighting inward or exposing card orientation.
+            // Tangential noise deforms the spherical direction without pulling
+            // the canopy lighting inward or exposing card orientation. The full
+            // slider is deliberately strong for validation; production defaults
+            // keep this broad deformation secondary to canopy volume.
             noiseVector -= radialDirectionOS * dot(noiseVector, radialDirectionOS);
             return SafeNormalize(radialDirectionOS
-                + noiseVector * (_NormalNoiseStrength * 0.24h));
+                + noiseVector * (_NormalNoiseStrength * 1.10h));
         }
 
         half3 SampleArtisticColorRamp(half lightingMask)
@@ -270,17 +272,20 @@ Shader "Meganeura/Stylized Foliage"
                     _InteriorColor.rgb * _BaseColor.rgb * detailModulation,
                     interiorAmount);
 
-                // A single broad field adds slight warm/cool and brightness drift.
-                // The bounded channel offsets retain the established palette and
-                // remain subordinate to directional lighting and canopy depth.
+                // A single broad field adds coherent brightness and warm/cool drift.
+                // Strength 1 is intentionally exaggerated for visual validation,
+                // while lower values preserve the established palette hierarchy.
                 half colorVariation = ValueNoise3D(GetCanopyVariationCoordinates(
                     input.positionOS, _ColorVariationScale) + float3(4.7, 13.2, 8.1));
-                colorVariation = (colorVariation * 2.0h - 1.0h)
+                // Expand the useful middle of value noise so the top half of the
+                // slider is readable without introducing hard bands.
+                colorVariation = (smoothstep(0.15h, 0.85h, colorVariation) * 2.0h - 1.0h)
                     * _ColorVariationStrength;
-                half3 variationTint = half3(1.0h + colorVariation * 0.12h,
+                half brightnessVariation = 1.0h + colorVariation * 0.48h;
+                half3 warmCoolTint = half3(1.0h + colorVariation * 0.20h,
                     1.0h + colorVariation * 0.05h,
-                    1.0h - colorVariation * 0.08h);
-                detailedColor *= variationTint;
+                    1.0h - colorVariation * 0.22h);
+                detailedColor *= brightnessVariation * warmCoolTint;
 
                 // Preserve the Spec 005 stop-based shadow control without black multiplication.
                 // Ambient remains palette-tinted and deliberately subordinate to avoid washout.
