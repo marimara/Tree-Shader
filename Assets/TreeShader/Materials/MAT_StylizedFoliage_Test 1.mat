@@ -55,9 +55,9 @@ Material:
     - _ShadowStrength: 1.05
     - _ShadowThreshold: 0.487
     - _StylizedNormalStrength: 1
-    - _WindScale: 0.97
-    - _WindSpeed: 1.01
-    - _WindStrength: 0.231
+    - _WindScale: 0.59
+    - _WindSpeed: 0.85
+    - _WindStrength: 0.213
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _CanopyCenterOffset: {r: 3.58, g: 1.78, b: 0.27, a: 0}
