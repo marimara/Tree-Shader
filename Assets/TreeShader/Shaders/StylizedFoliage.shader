@@ -29,6 +29,8 @@ Shader "Meganeura/Stylized Foliage"
         _HeightGradientPosition ("Height Gradient Position", Range(-1,1)) = -0.05
         _ColorVariationStrength ("Color Variation Strength", Range(0,1)) = 0.18
         _ColorVariationScale ("Color Variation Scale", Range(0.1,4)) = 0.9
+        _DistanceStart ("Detail Fade Start", Float) = 15
+        _DistanceEnd ("Detail Fade End", Float) = 45
     }
 
     SubShader
@@ -81,6 +83,8 @@ Shader "Meganeura/Stylized Foliage"
             half _HeightGradientPosition;
             half _ColorVariationStrength;
             half _ColorVariationScale;
+            float _DistanceStart;
+            float _DistanceEnd;
         CBUFFER_END
 
         struct Attributes
@@ -142,7 +146,21 @@ Shader "Meganeura/Stylized Foliage"
             return canopyLocal * (scale / max(_InteriorRadius, 0.0001h));
         }
 
-        float3 ApplyNormalNoise(float3 radialOS, float3 positionOS)
+        half ComputeDistanceDetailWeight()
+        {
+            // Use the object origin so the whole canopy shares one stable fade value.
+            // This avoids a distance gradient across large cards while preserving an
+            // exact Spec 009 result at and before _DistanceStart.
+            float3 objectOriginWS = TransformObjectToWorld(float3(0.0, 0.0, 0.0));
+            float cameraDistance = distance(GetCameraPositionWS(), objectOriginWS);
+            float fadeEnd = max(_DistanceEnd, _DistanceStart + 0.001);
+            float fadePosition = saturate((cameraDistance - _DistanceStart)
+                / (fadeEnd - _DistanceStart));
+            return (half)(1.0 - smoothstep(0.0, 1.0, fadePosition));
+        }
+
+        float3 ApplyNormalNoise(float3 radialOS, float3 positionOS,
+            half distanceDetailWeight)
         {
             float3 radialDirectionOS = SafeNormalize(radialOS);
             float3 noisePosition = GetCanopyVariationCoordinates(positionOS,
@@ -157,7 +175,7 @@ Shader "Meganeura/Stylized Foliage"
             // keep this broad deformation secondary to canopy volume.
             noiseVector -= radialDirectionOS * dot(noiseVector, radialDirectionOS);
             return SafeNormalize(radialDirectionOS
-                + noiseVector * (_NormalNoiseStrength * 1.10h));
+                + noiseVector * (_NormalNoiseStrength * distanceDetailWeight * 1.10h));
         }
 
         float3 BuildStableTangent(float3 baseNormalWS, float3 tangentWS)
@@ -175,11 +193,11 @@ Shader "Meganeura/Stylized Foliage"
             return SafeNormalize(cross(fallbackAxis, baseNormalWS));
         }
 
-        half3 SampleLeafNormalDetail(float2 normalUV)
+        half3 SampleLeafNormalDetail(float2 normalUV, half distanceDetailWeight)
         {
             half3 detailTS = UnpackNormal(SAMPLE_TEXTURE2D(
                 _NormalMap, sampler_NormalMap, normalUV));
-            detailTS.xy *= _NormalStrength;
+            detailTS.xy *= _NormalStrength * distanceDetailWeight;
             detailTS.z = sqrt(saturate(1.0h - dot(detailTS.xy, detailTS.xy)));
             return detailTS;
         }
@@ -270,7 +288,8 @@ Shader "Meganeura/Stylized Foliage"
                 float3 radialOS = input.positionOS.xyz - _CanopyCenterOffset.xyz;
                 // Only the exact center is undefined; do not clamp small imported meshes.
                 radialOS = dot(radialOS, radialOS) > 1e-20 ? radialOS : input.normalOS;
-                radialOS = ApplyNormalNoise(radialOS, input.positionOS.xyz);
+                radialOS = ApplyNormalNoise(radialOS, input.positionOS.xyz,
+                    ComputeDistanceDetailWeight());
                 output.radialNormalWS = TransformObjectToWorldNormal(radialOS);
                 output.positionOS = input.positionOS.xyz;
                 output.tangentWSAndSign = half4(normalInputs.tangentWS,
@@ -298,7 +317,9 @@ Shader "Meganeura/Stylized Foliage"
                 // lighting. The sampled leaf normal is evaluated later as a separate
                 // post-ramp microdetail signal.
                 float3 canopyNormalWS = normalWS;
-                half3 leafDetailTS = SampleLeafNormalDetail(input.normalUV);
+                half distanceDetailWeight = ComputeDistanceDetailWeight();
+                half3 leafDetailTS = SampleLeafNormalDetail(input.normalUV,
+                    distanceDetailWeight);
 
                 float4 shadowCoord = TransformWorldToShadowCoord(input.positionWS);
                 Light mainLight = GetMainLight(shadowCoord);
@@ -365,7 +386,7 @@ Shader "Meganeura/Stylized Foliage"
                 // Expand the useful middle of value noise so the top half of the
                 // slider is readable without introducing hard bands.
                 colorVariation = (smoothstep(0.15h, 0.85h, colorVariation) * 2.0h - 1.0h)
-                    * _ColorVariationStrength;
+                    * (_ColorVariationStrength * distanceDetailWeight);
                 half brightnessVariation = 1.0h + colorVariation * 0.48h;
                 half3 warmCoolTint = half3(1.0h + colorVariation * 0.20h,
                     1.0h + colorVariation * 0.05h,
@@ -504,7 +525,8 @@ Shader "Meganeura/Stylized Foliage"
                 half3 meshNormalWS = normalInputs.normalWS;
                 float3 radialOS = input.positionOS.xyz - _CanopyCenterOffset.xyz;
                 radialOS = dot(radialOS, radialOS) > 1e-20 ? radialOS : input.normalOS;
-                radialOS = ApplyNormalNoise(radialOS, input.positionOS.xyz);
+                radialOS = ApplyNormalNoise(radialOS, input.positionOS.xyz,
+                    ComputeDistanceDetailWeight());
                 half3 radialWS = TransformObjectToWorldNormal(radialOS);
                 half3 blendedWS = lerp(meshNormalWS, radialWS, _StylizedNormalStrength);
                 output.normalWS = dot(blendedWS, blendedWS) > 1e-8
@@ -519,7 +541,8 @@ Shader "Meganeura/Stylized Foliage"
             half4 DepthNormalsFrag(DepthNormalsVaryings input) : SV_Target
             {
                 clip(SampleLeafAlpha(input.alphaUV) - _AlphaClipThreshold);
-                half3 leafDetailTS = SampleLeafNormalDetail(input.normalUV);
+                half3 leafDetailTS = SampleLeafNormalDetail(input.normalUV,
+                    ComputeDistanceDetailWeight());
                 input.normalWS = ApplyLeafNormalDetail(input.normalWS,
                     input.tangentWSAndSign.xyz, input.tangentWSAndSign.w,
                     leafDetailTS);

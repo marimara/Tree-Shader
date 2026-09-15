@@ -41,6 +41,8 @@ Material:
     - _AlphaClipThreshold: 0.5
     - _ColorVariationScale: 0.9
     - _ColorVariationStrength: 0.18
+    - _DistanceEnd: 45
+    - _DistanceStart: 15
     - _HeightDarkening: 0.15
     - _HeightGradientPosition: -0.05
     - _InteriorRadius: 0.026
