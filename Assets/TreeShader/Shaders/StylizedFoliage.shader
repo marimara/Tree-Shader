@@ -12,6 +12,10 @@ Shader "Meganeura/Stylized Foliage"
         _ShadowSoftness ("Shadow Softness", Range(0,1)) = 0.5
         _ShadowStrength ("Shadow Strength (Stops)", Range(0,4)) = 1.5
         _LightDirectionBias ("Light Direction Bias (World Space)", Vector) = (0,0,0,0)
+        _LightColor ("Light Color", Color) = (0.75,1.0,0.22,1)
+        _MidColor ("Mid Color", Color) = (0.12,0.72,0.20,1)
+        _ShadowColor ("Shadow Color", Color) = (0.025,0.46,0.30,1)
+        _DeepShadowColor ("Deep Shadow Color", Color) = (0.02,0.32,0.30,1)
     }
 
     SubShader
@@ -45,6 +49,10 @@ Shader "Meganeura/Stylized Foliage"
             half _ShadowSoftness;
             half _ShadowStrength;
             float4 _LightDirectionBias;
+            half4 _LightColor;
+            half4 _MidColor;
+            half4 _ShadowColor;
+            half4 _DeepShadowColor;
         CBUFFER_END
 
         struct Attributes
@@ -68,6 +76,18 @@ Shader "Meganeura/Stylized Foliage"
         half SampleLeafAlpha(float2 uv)
         {
             return SAMPLE_TEXTURE2D(_AlphaMap, sampler_AlphaMap, uv).r;
+        }
+
+        half3 SampleArtisticColorRamp(half lightingMask)
+        {
+            half rampPosition = saturate(lightingMask) * 3.0h;
+            half3 color = lerp(_DeepShadowColor.rgb, _ShadowColor.rgb,
+                smoothstep(0.0h, 1.0h, rampPosition));
+            color = lerp(color, _MidColor.rgb,
+                smoothstep(0.0h, 1.0h, rampPosition - 1.0h));
+            color = lerp(color, _LightColor.rgb,
+                smoothstep(0.0h, 1.0h, rampPosition - 2.0h));
+            return color;
         }
         ENDHLSL
 
@@ -109,7 +129,7 @@ Shader "Meganeura/Stylized Foliage"
             {
                 clip(SampleLeafAlpha(input.alphaUV) - _AlphaClipThreshold);
 
-                half4 baseSample = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.baseUV) * _BaseColor;
+                half4 baseSample = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.baseUV);
                 half3 normalWS = normalize(input.normalWS);
                 normalWS *= IS_FRONT_VFACE(faceSign, 1.0h, -1.0h);
                 // Radial normals describe the canopy, so never flip them on card backfaces.
@@ -131,12 +151,22 @@ Shader "Meganeura/Stylized Foliage"
                 // Realtime occlusion changes the mask, never multiplies final RGB.
                 lightingMask *= mainLight.shadowAttenuation;
                 half3 ambient = max(SampleSH(normalWS), 0.0h);
-                // Spec 005 uses the existing base color for both endpoints.
-                // Strength is exposure stops: 0 keeps base color, 1 halves it, 4 retains 1/16.
-                // Even maximum strength has a colored endpoint; no separate palette system.
-                half3 shadedColor = baseSample.rgb * exp2(-_ShadowStrength);
-                half3 litColor = baseSample.rgb * mainLight.color * mainLight.distanceAttenuation;
-                half3 color = baseSample.rgb * ambient + lerp(shadedColor, litColor, lightingMask);
+
+                // The palette owns hue. BaseMap contributes only bounded luminance detail,
+                // so the source olive color cannot steer the final color identity.
+                const half3 luminanceWeights = half3(0.2126h, 0.7152h, 0.0722h);
+                half baseLuminance = dot(baseSample.rgb, luminanceWeights);
+                half detailModulation = lerp(0.65h, 1.35h, saturate(baseLuminance));
+                half3 paletteColor = SampleArtisticColorRamp(lightingMask) * _BaseColor.rgb;
+                half3 detailedColor = paletteColor * detailModulation;
+
+                // Preserve the Spec 005 stop-based shadow control without black multiplication.
+                // Ambient remains palette-tinted and deliberately subordinate to avoid washout.
+                half shadowExposure = lerp(exp2(-_ShadowStrength), 1.0h, lightingMask);
+                half3 mainLightTint = lerp(1.0h, mainLight.color * mainLight.distanceAttenuation,
+                    lightingMask * 0.35h);
+                half3 ambientContribution = detailedColor * ambient * 0.35h;
+                half3 color = detailedColor * mainLightTint * shadowExposure + ambientContribution;
                 color = MixFog(color, input.fogFactor);
                 return half4(color, 1.0h);
             }

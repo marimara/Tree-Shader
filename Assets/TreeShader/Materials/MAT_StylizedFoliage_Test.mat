@@ -41,6 +41,10 @@ Material:
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _CanopyCenterOffset: {r: 0.014050544, g: -0.0021115066, b: -0.0038637575, a: 0}
+    - _DeepShadowColor: {r: 0.02, g: 0.32, b: 0.3, a: 1}
+    - _LightColor: {r: 0.75, g: 1, b: 0.22, a: 1}
     - _LightDirectionBias: {r: 0, g: 0, b: 0, a: 0}
+    - _MidColor: {r: 0.12, g: 0.72, b: 0.2, a: 1}
+    - _ShadowColor: {r: 0.025, g: 0.46, b: 0.3, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
