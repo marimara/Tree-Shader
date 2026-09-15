@@ -6,6 +6,8 @@ Shader "Meganeura/Stylized Foliage"
         _AlphaMap ("Alpha Map", 2D) = "white" {}
         _BaseColor ("Base Color", Color) = (1,1,1,1)
         _AlphaClipThreshold ("Alpha Clip Threshold", Range(0,1)) = 0.5
+        _StylizedNormalStrength ("Stylized Normal Strength", Range(0,1)) = 0
+        _CanopyCenterOffset ("Canopy Center (Object Space)", Vector) = (0,0,0,0)
     }
 
     SubShader
@@ -33,6 +35,8 @@ Shader "Meganeura/Stylized Foliage"
             float4 _AlphaMap_ST;
             half4 _BaseColor;
             half _AlphaClipThreshold;
+            float4 _CanopyCenterOffset;
+            half _StylizedNormalStrength;
         CBUFFER_END
 
         struct Attributes
@@ -50,6 +54,7 @@ Shader "Meganeura/Stylized Foliage"
             float2 baseUV : TEXCOORD2;
             float2 alphaUV : TEXCOORD3;
             half fogFactor : TEXCOORD4;
+            float3 radialNormalWS : TEXCOORD5;
         };
 
         half SampleLeafAlpha(float2 uv)
@@ -81,6 +86,11 @@ Shader "Meganeura/Stylized Foliage"
                 output.positionCS = positionInputs.positionCS;
                 output.positionWS = positionInputs.positionWS;
                 output.normalWS = normalInputs.normalWS;
+                // Keep the offset in mesh units, independent of translation and uniform scale.
+                float3 radialOS = input.positionOS.xyz - _CanopyCenterOffset.xyz;
+                // Only the exact center is undefined; do not clamp small imported meshes.
+                radialOS = dot(radialOS, radialOS) > 1e-20 ? radialOS : input.normalOS;
+                output.radialNormalWS = TransformObjectToWorldNormal(radialOS);
                 output.baseUV = TRANSFORM_TEX(input.uv, _BaseMap);
                 output.alphaUV = TRANSFORM_TEX(input.uv, _AlphaMap);
                 output.fogFactor = ComputeFogFactor(positionInputs.positionCS.z);
@@ -94,6 +104,11 @@ Shader "Meganeura/Stylized Foliage"
                 half4 baseSample = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.baseUV) * _BaseColor;
                 half3 normalWS = normalize(input.normalWS);
                 normalWS *= IS_FRONT_VFACE(faceSign, 1.0h, -1.0h);
+                // Radial normals describe the canopy, so never flip them on card backfaces.
+                float3 radialWS = SafeNormalize(input.radialNormalWS);
+                float3 blendedWS = lerp(normalWS, radialWS, _StylizedNormalStrength);
+                // Opposing normals can cancel at the midpoint; keep a finite direction.
+                normalWS = dot(blendedWS, blendedWS) > 1e-8 ? normalize(blendedWS) : radialWS;
 
                 float4 shadowCoord = TransformWorldToShadowCoord(input.positionWS);
                 Light mainLight = GetMainLight(shadowCoord);

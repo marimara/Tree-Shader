@@ -34,7 +34,9 @@ Material:
     m_Ints: []
     m_Floats:
     - _AlphaClipThreshold: 0.5
+    - _StylizedNormalStrength: 1
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
+    - _CanopyCenterOffset: {r: 0.014050544, g: -0.0021115066, b: -0.0038637575, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
