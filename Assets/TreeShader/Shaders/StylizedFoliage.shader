@@ -9,6 +9,7 @@ Shader "Meganeura/Stylized Foliage"
         _AlphaClipThreshold ("Alpha Clip Threshold", Range(0,1)) = 0.5
         _StylizedNormalStrength ("Stylized Normal Strength", Range(0,1)) = 0
         _NormalStrength ("Normal Strength", Range(0,1)) = 0.35
+        _NormalDetailContrast ("Normal Detail Contrast", Range(0,0.5)) = 0.4
         _CanopyCenterOffset ("Canopy Center (Object Space)", Vector) = (0,0,0,0)
         _NormalNoiseStrength ("Normal Noise Strength", Range(0,1)) = 0.18
         _NormalNoiseScale ("Normal Noise Scale", Range(0.1,4)) = 0.75
@@ -61,6 +62,7 @@ Shader "Meganeura/Stylized Foliage"
             float4 _CanopyCenterOffset;
             half _StylizedNormalStrength;
             half _NormalStrength;
+            half _NormalDetailContrast;
             half _NormalNoiseStrength;
             half _NormalNoiseScale;
             half _ShadowThreshold;
@@ -173,8 +175,17 @@ Shader "Meganeura/Stylized Foliage"
             return SafeNormalize(cross(fallbackAxis, baseNormalWS));
         }
 
+        half3 SampleLeafNormalDetail(float2 normalUV)
+        {
+            half3 detailTS = UnpackNormal(SAMPLE_TEXTURE2D(
+                _NormalMap, sampler_NormalMap, normalUV));
+            detailTS.xy *= _NormalStrength;
+            detailTS.z = sqrt(saturate(1.0h - dot(detailTS.xy, detailTS.xy)));
+            return detailTS;
+        }
+
         float3 ApplyLeafNormalDetail(float3 baseNormalWS, float3 tangentWS,
-            half tangentSign, float2 normalUV)
+            half tangentSign, half3 detailTS)
         {
             baseNormalWS = SafeNormalize(baseNormalWS);
             float3 tangent = BuildStableTangent(baseNormalWS, tangentWS);
@@ -183,17 +194,35 @@ Shader "Meganeura/Stylized Foliage"
             // Reconstructing Z after scaling XY gives a valid unit tangent-space
             // normal. At strength zero it is exactly (0,0,1), so the Spec 008
             // canopy normal passes through unchanged.
-            half3 detailTS = UnpackNormal(SAMPLE_TEXTURE2D(
-                _NormalMap, sampler_NormalMap, normalUV));
-            detailTS.xy *= _NormalStrength;
-            detailTS.z = sqrt(saturate(1.0h - dot(detailTS.xy, detailTS.xy)));
-
             // Rotate the tangent-space detail into an orthonormal frame whose Z
             // axis is the stylized canopy normal. This adds a surface gradient
             // without replacing or naively adding to the large-scale normal.
             return SafeNormalize(tangent * detailTS.x
                 + bitangent * detailTS.y
                 + baseNormalWS * detailTS.z);
+        }
+
+        half ComputeLeafDetailModulation(half3 detailTS)
+        {
+            // Slope magnitude is a light-independent structural mask: a flat
+            // tangent-space normal contributes nothing, while veins, folds and
+            // curved leaf surfaces remain visible in every palette region.
+            half slopeMagnitude = saturate(length(detailTS.xy));
+            half structureMask = smoothstep(0.035h, 0.45h, slopeMagnitude);
+
+            // A fixed tangent-space direction supplies a deliberately non-physical
+            // emboss. It never rotates with or samples the Main Light, so the same
+            // local relief survives when the canopy moves between ramp colors.
+            const half2 embossDirectionTS = half2(0.554700h, 0.832050h);
+            half emboss = dot(detailTS.xy, embossDirectionTS);
+            emboss = clamp(emboss * 1.25h, -0.65h, 0.65h) * structureMask;
+
+            // The small slope darkening makes unsigned ridges readable even where
+            // the signed emboss is near zero. Both terms are strength-scaled through
+            // detailTS.xy, and at _NormalStrength = 0 this returns exactly 1.
+            half detailSignal = clamp(emboss - structureMask * 0.20h,
+                -0.80h, 0.65h);
+            return max(0.0h, 1.0h + detailSignal * _NormalDetailContrast);
         }
 
         half3 SampleArtisticColorRamp(half lightingMask)
@@ -265,9 +294,11 @@ Shader "Meganeura/Stylized Foliage"
                 float3 blendedWS = lerp(normalWS, radialWS, _StylizedNormalStrength);
                 // Opposing normals can cancel at the midpoint; keep a finite direction.
                 normalWS = dot(blendedWS, blendedWS) > 1e-8 ? normalize(blendedWS) : radialWS;
-                normalWS = ApplyLeafNormalDetail(normalWS,
-                    input.tangentWSAndSign.xyz, input.tangentWSAndSign.w,
-                    input.normalUV);
+                // Keep this normal exclusively responsible for the large canopy
+                // lighting. The sampled leaf normal is evaluated later as a separate
+                // post-ramp microdetail signal.
+                float3 canopyNormalWS = normalWS;
+                half3 leafDetailTS = SampleLeafNormalDetail(input.normalUV);
 
                 float4 shadowCoord = TransformWorldToShadowCoord(input.positionWS);
                 Light mainLight = GetMainLight(shadowCoord);
@@ -275,13 +306,13 @@ Shader "Meganeura/Stylized Foliage"
                 float3 bias = _LightDirectionBias.xyz;
                 bias *= min(1.0, 0.25 / max(length(bias), 1e-5));
                 float3 lightDirection = SafeNormalize(mainLight.direction + bias);
-                half lambertMask = dot(normalWS, lightDirection) * 0.5h + 0.5h;
+                half lambertMask = dot(canopyNormalWS, lightDirection) * 0.5h + 0.5h;
                 half halfWidth = max(_ShadowSoftness * 0.5h, 0.0001h);
                 half lightingMask = smoothstep(_ShadowThreshold - halfWidth,
                     _ShadowThreshold + halfWidth, lambertMask);
                 // Realtime occlusion changes the mask, never multiplies final RGB.
                 lightingMask *= mainLight.shadowAttenuation;
-                half3 ambient = max(SampleSH(normalWS), 0.0h);
+                half3 ambient = max(SampleSH(canopyNormalWS), 0.0h);
 
                 // The palette owns hue. BaseMap contributes only bounded luminance detail,
                 // so the source olive color cannot steer the final color identity.
@@ -348,6 +379,8 @@ Shader "Meganeura/Stylized Foliage"
                     lightingMask * 0.35h);
                 half3 ambientContribution = detailedColor * ambient * 0.35h;
                 half3 color = detailedColor * mainLightTint * shadowExposure + ambientContribution;
+                half normalDetailModulation = ComputeLeafDetailModulation(leafDetailTS);
+                color *= normalDetailModulation;
                 color = MixFog(color, input.fogFactor);
                 return half4(color, 1.0h);
             }
@@ -486,9 +519,10 @@ Shader "Meganeura/Stylized Foliage"
             half4 DepthNormalsFrag(DepthNormalsVaryings input) : SV_Target
             {
                 clip(SampleLeafAlpha(input.alphaUV) - _AlphaClipThreshold);
+                half3 leafDetailTS = SampleLeafNormalDetail(input.normalUV);
                 input.normalWS = ApplyLeafNormalDetail(input.normalWS,
                     input.tangentWSAndSign.xyz, input.tangentWSAndSign.w,
-                    input.normalUV);
+                    leafDetailTS);
 
                 #if defined(_GBUFFER_NORMALS_OCT)
                     float2 octNormalWS = PackNormalOctQuadEncode(normalize(input.normalWS));
