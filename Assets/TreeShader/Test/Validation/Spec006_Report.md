@@ -1,54 +1,63 @@
-# Spec 006 — Artistic Foliage Color System
+# Spec 006 — Refinamento do sistema artístico de cor
 
 ## Implementado
 
-Somente a Spec 006. A máscara de iluminação estilizada da Spec 005 agora percorre uma rampa suave `Deep Shadow → Shadow → Midtone → Light`. As quatro cores são propriedades editáveis do material e definem o hue da folhagem. Não foram adicionadas bandas discretas nem recursos da Spec 007.
+Somente sistemas já pertencentes à Spec 006 foram refinados. A rampa contínua `Deep Shadow → Shadow → Midtone → Light` continua sendo dirigida pela máscara de iluminação da Spec 005, mas agora aplica um viés suave (`lightingMask * 0.85 + 0.15`) antes dos três segmentos. Isso comprime a presença visual de Deep Shadow e faz MidColor/LightColor entrarem mais cedo, sem criar bandas discretas e sem remover a editabilidade de nenhuma das quatro cores.
+
+Não foram adicionados canopy density, interior darkening, AO, normal noise, normal map, distance behaviour ou wind.
+
+## Paleta final
+
+| Propriedade | Valor linear RGBA |
+| --- | --- |
+| `_LightColor` | `(0.36, 0.68, 0.18, 1.00)` |
+| `_MidColor` | `(0.18, 0.55, 0.20, 1.00)` |
+| `_ShadowColor` | `(0.08, 0.42, 0.20, 1.00)` |
+| `_DeepShadowColor` | `(0.055, 0.34, 0.19, 1.00)` |
+
+O Light perdeu o caráter amarelo/lime excessivo. Shadow e Deep Shadow permanecem verdes saturados; Deep Shadow tem apenas uma tendência fria leve. A distância cromática e de valor entre os quatro pontos foi reduzida.
 
 ## Tratamento da BaseMap
 
-`leaf0_diff` continua sendo amostrada uma única vez, mas seu RGB não multiplica mais diretamente a cor artística. O shader extrai luminância da textura e a remapeia para uma modulação de detalhe limitada a 0.65–1.35. Assim, diferenças locais entre folhas e variação de valor permanecem visíveis, enquanto o verde-oliva da textura não pode dominar o hue final. `_BaseColor` permanece como tint global da paleta.
+`leaf0_diff` continua fornecendo somente luminância/detalhe, sem multiplicação do RGB original pela paleta. A modulação foi reduzida de `0.65–1.35` para `0.85–1.15`. O hue oliva continua sem controlar a identidade final, mas diferenças locais entre folhas e textura fina permanecem visíveis.
 
 ## Iluminação
 
-As normais estilizadas, Main Light, máscara suavizada, atenuação de sombra, `_ShadowThreshold`, `_ShadowSoftness`, `_ShadowStrength` em stops e `_LightDirectionBias` foram preservados. A cor da Main Light contribui suavemente nas áreas iluminadas. O ambiente usa `SampleSH`, mas sua contribuição é multiplicada pela própria cor da paleta e limitada a 35%, evitando desaturação e washout.
+`_ShadowStrength` final: `0.7` stop. `_ShadowThreshold = 0.5`, `_ShadowSoftness = 0.5`, `_LightDirectionBias = (0,0,0,0)` e `_StylizedNormalStrength = 1` foram preservados. A contribuição de Main Light e ambiente não foi reestruturada.
 
 ## Assets modificados
 
 - `Assets/TreeShader/Shaders/StylizedFoliage.shader`
 - `Assets/TreeShader/Materials/MAT_StylizedFoliage_Test.mat`
-- Este relatório e capturas `Spec006_*.png` nesta pasta.
+- `Assets/TreeShader/Test/Validation/Spec006_Report.md`
+- Capturas `Spec006_Refine_*.png` desta pasta
 
-`Assets/TreeShader/Test/TreeShader_TestScene.unity` foi usada e salva após os testes, com o Sun restaurado exatamente ao estado inicial; o arquivo não possui alteração de conteúdo em relação à linha de base. Nenhum source asset, mesh ou material de tronco foi alterado.
-
-## Propriedades adicionadas
-
-| Propriedade | Paleta inicial |
-| --- | --- |
-| `_LightColor` | amarelo-verde luminoso `(0.75, 1.00, 0.22)` |
-| `_MidColor` | verde fresco saturado `(0.12, 0.72, 0.20)` |
-| `_ShadowColor` | emerald/blue-green `(0.025, 0.46, 0.30)` |
-| `_DeepShadowColor` | teal escuro `(0.02, 0.32, 0.30)` |
+`TreeShader_TestScene.unity` foi usada e salva após a restauração do Sun; o arquivo permanece sem diferença de conteúdo. Nenhum source asset, mesh ou material de tronco foi alterado.
 
 ## Validação
 
-- Unity 6000.6.0f1, URP, cena `TreeShader_TestScene`.
-- Objetos verificados: `Tree_Test`, filho `leaves1`, `Foliage_Test`, Ground e Sun.
-- Cada uma das quatro cores foi substituída temporariamente por uma cor de diagnóstico; cada controle alterou somente sua região esperada da rampa e foi restaurado.
-- BaseMap real versus textura branca: a BaseMap real recupera variação local de valor; sua remoção deixa a copa mais plana. O hue oliva não reaparece na configuração final.
-- Sun testado em `(45,325,0)`, `(45,55,0)`, `(45,235,0)`, `(45,145,0)`, `(80,325,0)` e `(10,325,0)`. As massas coloridas acompanham frente, lado, direção oposta, traseira, sol alto e baixo.
-- Sombras None versus Soft confirmaram que a atenuação realtime continua alimentando a rampa; sombras Soft foram restauradas com força 0.8.
-- `_ShadowThreshold` 0/1, `_ShadowSoftness` 0/1, `_ShadowStrength` 0/4 e `_StylizedNormalStrength` 0/1 produziram diferenças claras. `_LightDirectionBias=(0.25,0,0)` deslocou a resposta e foi restaurado a zero.
-- `_AlphaClipThreshold=0.95` confirmou recorte conjunto de folhas e sombras; restaurado a 0.5. `Cull Off`, ShadowCaster e DepthOnly não foram modificados.
-- Tronco permanece em `MAT_Bark_Test`; folhas permanecem em `MAT_StylizedFoliage_Test`.
-- Shader suportado, `ShaderHasError=False`, zero mensagens de compilação.
+- Unity 6000.6.0f1, URP, cena `Assets/TreeShader/Test/TreeShader_TestScene.unity`.
+- Objetos observados: `Tree_Test`, `Foliage_Test`, Ground e Sun.
+- Sun testado em frente `(45,325,0)`, lateral `(45,55,0)`, direção oposta `(45,235,0)`, alto `(80,325,0)` e baixo `(10,325,0)`; restaurado para `(45,325,0)`.
+- `_LightColor`, `_MidColor`, `_ShadowColor` e `_DeepShadowColor` foram substituídas individualmente por cores diagnósticas e cada uma afetou a região esperada. Deep Shadow ficou concentrada principalmente nas áreas direcionais mais profundas.
+- `_AlphaClipThreshold = 0.95` confirmou o recorte das folhas e das sombras. `Cull Off`, ShadowCaster e DepthOnly não foram modificados.
+- `_StylizedNormalStrength = 0/1`, `_ShadowStrength = 0/0.7` e `_ShadowSoftness = 0/0.5` continuaram produzindo diferenças claras; os valores finais foram restaurados.
+- O shader foi reimportado, o Editor terminou o ciclo de compilação e permaneceu `ready_for_tools`, sem mensagens de shader no Console.
+- O Console não contém erro causado por TreeShader. Permanecem mensagens não relacionadas: `NoSubscription` do pacote Unity AI e um aviso transitório do transporte WebSocket do MCP.
+
+## Comparação com TargetArtDirection
+
+O resultado final está visualmente mais próximo de `TargetArtDirection.png`: predominam verdes médios e claros, os highlights não estouram em lime, as sombras são verdes em vez de teal dominante, a transição é mais suave e as regiões muito escuras ocupam menos área. A BaseMap ainda separa folhas localmente, mas sua variação de luminância deixou de fragmentar as massas principais.
+
+A correspondência não é literal: o mesh de teste é conífero e composto por foliage cards mais espaçados, enquanto a referência mostra copas largas e densas. Dentro da Spec 006, a paleta, contraste, saturação e balanço de luz/sombra estão razoavelmente alinhados ao alvo.
 
 ## Limitações
 
-- A rampa utiliza um único centro radial por objeto, mantendo as limitações já documentadas na Spec 004 para copas compostas e escala não uniforme.
-- `_ShadowStrength` alto ainda pode tornar a região profunda muito escura, embora ela permaneça cromática e receba ambiente.
-- O detalhe da BaseMap é deliberadamente apenas de luminância; variações cromáticas originais não são preservadas por design.
-- As capturas MCP validam a leitura geral em resolução moderada, não substituem avaliação artística final em tela calibrada.
+- A geometria do asset de teste limita a semelhança de silhueta e densidade com a referência.
+- A rampa continua baseada em um único centro radial por objeto, com as limitações já documentadas na Spec 004 para copas compostas e escala não uniforme.
+- Sob iluminação completamente oposta, uma área direcional sombreada grande ainda é esperada; não foi mascarada com densidade/AO porque isso pertence à Spec 007.
+- A BaseMap contribui somente luminância por design; seu hue original não é preservado.
 
 ## Próxima Spec
 
-`Spec 007 — Canopy Depth and Interior Shading` — não implementada nesta tarefa.
+`Spec 007 — Canopy Depth and Interior Shading` permanece o próximo marco, mas não foi implementada nem iniciada nesta tarefa.

@@ -10,12 +10,12 @@ Shader "Meganeura/Stylized Foliage"
         _CanopyCenterOffset ("Canopy Center (Object Space)", Vector) = (0,0,0,0)
         _ShadowThreshold ("Shadow Threshold", Range(0,1)) = 0.5
         _ShadowSoftness ("Shadow Softness", Range(0,1)) = 0.5
-        _ShadowStrength ("Shadow Strength (Stops)", Range(0,4)) = 1.5
+        _ShadowStrength ("Shadow Strength (Stops)", Range(0,4)) = 0.7
         _LightDirectionBias ("Light Direction Bias (World Space)", Vector) = (0,0,0,0)
-        _LightColor ("Light Color", Color) = (0.75,1.0,0.22,1)
-        _MidColor ("Mid Color", Color) = (0.12,0.72,0.20,1)
-        _ShadowColor ("Shadow Color", Color) = (0.025,0.46,0.30,1)
-        _DeepShadowColor ("Deep Shadow Color", Color) = (0.02,0.32,0.30,1)
+        _LightColor ("Light Color", Color) = (0.36,0.68,0.18,1)
+        _MidColor ("Mid Color", Color) = (0.18,0.55,0.20,1)
+        _ShadowColor ("Shadow Color", Color) = (0.08,0.42,0.20,1)
+        _DeepShadowColor ("Deep Shadow Color", Color) = (0.055,0.34,0.19,1)
     }
 
     SubShader
@@ -80,7 +80,9 @@ Shader "Meganeura/Stylized Foliage"
 
         half3 SampleArtisticColorRamp(half lightingMask)
         {
-            half rampPosition = saturate(lightingMask) * 3.0h;
+            // Compress the deepest directional region so the canopy is led by
+            // mid and light greens while Deep Shadow remains an editable endpoint.
+            half rampPosition = saturate(lightingMask * 0.85h + 0.15h) * 3.0h;
             half3 color = lerp(_DeepShadowColor.rgb, _ShadowColor.rgb,
                 smoothstep(0.0h, 1.0h, rampPosition));
             color = lerp(color, _MidColor.rgb,
@@ -156,7 +158,7 @@ Shader "Meganeura/Stylized Foliage"
                 // so the source olive color cannot steer the final color identity.
                 const half3 luminanceWeights = half3(0.2126h, 0.7152h, 0.0722h);
                 half baseLuminance = dot(baseSample.rgb, luminanceWeights);
-                half detailModulation = lerp(0.65h, 1.35h, saturate(baseLuminance));
+                half detailModulation = lerp(0.85h, 1.15h, saturate(baseLuminance));
                 half3 paletteColor = SampleArtisticColorRamp(lightingMask) * _BaseColor.rgb;
                 half3 detailedColor = paletteColor * detailModulation;
 

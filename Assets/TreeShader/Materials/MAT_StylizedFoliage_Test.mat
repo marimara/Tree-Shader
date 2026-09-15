@@ -35,16 +35,16 @@ Material:
     m_Floats:
     - _AlphaClipThreshold: 0.5
     - _ShadowSoftness: 0.5
-    - _ShadowStrength: 1.5
+    - _ShadowStrength: 0.7
     - _ShadowThreshold: 0.5
     - _StylizedNormalStrength: 1
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _CanopyCenterOffset: {r: 0.014050544, g: -0.0021115066, b: -0.0038637575, a: 0}
-    - _DeepShadowColor: {r: 0.02, g: 0.32, b: 0.3, a: 1}
-    - _LightColor: {r: 0.75, g: 1, b: 0.22, a: 1}
+    - _DeepShadowColor: {r: 0.055, g: 0.34, b: 0.19, a: 1}
+    - _LightColor: {r: 0.36, g: 0.68, b: 0.18, a: 1}
     - _LightDirectionBias: {r: 0, g: 0, b: 0, a: 0}
-    - _MidColor: {r: 0.12, g: 0.72, b: 0.2, a: 1}
-    - _ShadowColor: {r: 0.025, g: 0.46, b: 0.3, a: 1}
+    - _MidColor: {r: 0.18, g: 0.55, b: 0.2, a: 1}
+    - _ShadowColor: {r: 0.08, g: 0.42, b: 0.2, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

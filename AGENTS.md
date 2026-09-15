@@ -61,7 +61,7 @@ Visual references are stored in:
 
 Use them as artistic guidance.
 
-The references have different purposes:
+The references have different purposes.
 
 ## Technical Reference
 
@@ -77,9 +77,11 @@ The technical reference demonstrates ideas such as:
 - normal variation
 - distance-based detail control
 
-Use these ideas as inspiration for implementation.
+Use these ideas as technical inspiration.
 
 Do not attempt to reproduce the reference shader line-for-line.
+
+Do not use the technical reference as the primary color target.
 
 ## Target Art Direction
 
@@ -90,42 +92,115 @@ Prioritize:
 - soft light transitions
 - bright exposed foliage
 - saturated green midtones
-- cool green/teal shadows
-- darker canopy interiors
+- cool green shadows
+- darker but still colorful canopy regions
 - rounded foliage volumes
 - readable large-scale lighting
 - stylized rather than realistic appearance
 
-Do not copy the reference colors literally.
+The target art reference has higher priority than the technical reference when evaluating:
+
+- palette
+- contrast
+- saturation
+- perceived softness
+- overall art direction
+
+Do not copy reference colors literally.
 
 Material properties should allow the artist to recreate or alter the palette.
 
 ---
 
-# Unity MCP Usage
+# MCP for Unity Usage
 
-Use the Unity MCP whenever interaction with the Unity project is required.
+Use the installed **MCP for Unity** integration whenever interaction with the live Unity Editor or project state is required.
 
-The MCP should be used to:
+Use it to:
 
 - inspect the current project hierarchy
+- inspect scene contents
 - inspect existing assets
 - inspect imported models
 - inspect materials
 - inspect shaders
 - inspect render pipeline configuration
-- inspect scene contents
-- create and edit project assets when supported
-- open or inspect the shader test scene
-- apply test materials
 - inspect the Unity Console
+- open or inspect the shader test scene
+- apply or inspect test materials
 - verify shader compilation
 - verify the visual result
-- save modified assets and scenes
+- save modified assets and scenes when supported
 
-Do not assume the Unity project state.
+Do not assume project state.
 
 Inspect it before making changes.
+
+Do not switch between multiple Unity MCP integrations during the same task unless explicitly requested by the user.
+
+---
+
+# Unity Editor Session Rules
+
+Use the Unity Editor instance that is already open for this project.
+
+Do not manage Unity processes as part of normal shader development.
+
+Unless explicitly approved by the user, do NOT:
+
+- launch another Unity Editor instance
+- close the currently open Unity Editor
+- restart Unity
+- kill Unity processes
+- terminate Unity from the command line
+- remove or modify `Temp/UnityLockfile`
+- assume a Unity lock file represents a stale process
+- modify Unity Hub state
+- force a project reload to repair MCP connectivity
+
+The Unity Editor lifecycle belongs to the user.
+
+---
+
+# MCP Infrastructure Safety
+
+MCP connectivity problems are infrastructure problems, not shader-development tasks.
+
+If MCP for Unity becomes unavailable, disconnected, stale, or unable to inspect the currently open Editor:
+
+1. Do not modify MCP infrastructure.
+2. Do not start another MCP server.
+3. Do not stop an MCP server.
+4. Do not restart or reconfigure an MCP server.
+5. Do not manually bind MCP services to ports.
+6. Do not launch replacement HTTP/WebSocket servers.
+7. Do not restart Unity.
+8. Do not kill Unity processes.
+9. Do not delete lock files.
+
+Stop the current implementation attempt and report:
+
+- that MCP for Unity is unavailable
+- the last successful operation
+- the failed operation
+- whether code/assets were already modified
+- whether Unity-side validation remains incomplete
+
+Then wait for user instruction.
+
+Do not spend task time debugging MCP infrastructure unless explicitly asked to do so.
+
+---
+
+# Temporary Diagnostic Files
+
+Do not place infrastructure logs, MCP diagnostics, temporary server logs, process dumps, or unrelated debugging output inside `Assets/`.
+
+Unity automatically imports files under `Assets/`, which may generate unnecessary reimports and Console noise.
+
+If temporary external diagnostics are explicitly required, keep them outside the Unity project's `Assets/` folder.
+
+Do not create diagnostic artifacts unless necessary for the current specification.
 
 ---
 
@@ -136,13 +211,15 @@ Before implementing a specification:
 1. Read this `AGENTS.md`.
 2. Read `001-project-goal.md`.
 3. Read the current specification.
-4. Read any earlier specification required to understand existing systems.
-5. Inspect the current Unity project through MCP.
+4. Read earlier specifications only as needed to understand validated existing systems.
+5. Inspect the current Unity project through MCP for Unity.
 6. Inspect existing TreeShader assets before creating new ones.
 7. Inspect the Console before starting.
 8. Confirm that the previous milestone is still functional.
 
 Do not create duplicate shaders, materials, folders, scenes or scripts when an appropriate asset already exists.
+
+Do not repeatedly reread every previous specification if the current project state and required dependency are already clear.
 
 ---
 
@@ -162,10 +239,13 @@ Examples:
 
 - Spec 004 must not break alpha clipping from Spec 003.
 - Spec 005 must not break radial normals from Spec 004.
+- Spec 006 must not break the stylized lighting response from Spec 005.
 - Spec 009 must not destroy large-scale canopy shading established by Specs 004 and 005.
 - Spec 011 must not break lighting, alpha, shadows or silhouette.
 
 Do not rewrite working shader systems without a clear technical reason.
+
+If only calibration is required, prefer calibration over architectural rewriting.
 
 ---
 
@@ -212,6 +292,8 @@ If the scene does not exist yet, create it according to `002-test-scene.md`.
 Use the imported tree asset intended for testing, preferably `tree1` unless project state indicates a better existing choice.
 
 When available, also use a foliage-only mesh such as `leaves1`.
+
+Do not replace validated test assets unnecessarily.
 
 ---
 
@@ -275,7 +357,7 @@ Do not allow small-scale leaf detail to overpower the first three.
 
 # Radial / Spherical Normals
 
-When implementing stylized normals:
+When implementing or maintaining stylized normals:
 
 - treat the foliage canopy as a larger rounded volume
 - avoid exposing individual foliage-card orientation
@@ -285,6 +367,27 @@ When implementing stylized normals:
 - expose artistic control over the blend between mesh normals and stylized normals
 
 The goal is visual coherence, not mathematical purity.
+
+---
+
+# Artistic Calibration Rules
+
+When a specification is technically functional but visually distant from `TargetArtDirection`, refine the current specification before advancing.
+
+Do not rely on later specifications to fix problems that belong to the current milestone.
+
+Examples:
+
+If Spec 006 currently produces:
+
+- excessive lime highlights
+- overly teal deep shadows
+- excessive contrast
+- overly aggressive BaseMap luminance variation
+
+those should be refined within Spec 006 before advancing to Spec 007.
+
+Later systems must not be used to hide unresolved art-direction problems in earlier systems.
 
 ---
 
@@ -303,6 +406,7 @@ Prefer names such as:
 - `_ShadowThreshold`
 - `_ShadowSoftness`
 - `_ShadowStrength`
+- `_LightDirectionBias`
 - `_LightColor`
 - `_MidColor`
 - `_ShadowColor`
@@ -329,23 +433,26 @@ A specification is not complete merely because code was written.
 
 A specification is not complete merely because the shader compiles.
 
-Every milestone must be validated in Unity.
+Every milestone must be validated in Unity through MCP for Unity.
 
 After implementing a spec:
 
 1. Save all modified assets.
-2. Save modified scenes.
+2. Save modified scenes when required.
 3. Allow Unity to import and compile.
 4. Inspect the Unity Console.
 5. Fix shader compilation errors.
 6. Fix material/property errors.
 7. Open or inspect `TreeShader_TestScene`.
-8. Apply the current test material.
+8. Apply or inspect the current test material.
 9. Visually inspect the feature.
 10. Verify previously completed features still work.
-11. Report the result.
+11. Compare against the relevant visual reference.
+12. Report the result.
 
 Do not declare completion before visual validation.
+
+If MCP for Unity is unavailable, visual validation is incomplete.
 
 ---
 
@@ -363,7 +470,11 @@ Specifically verify:
 
 Warnings should be reviewed.
 
-Do not ignore recurring warnings without explaining them.
+Known unrelated warnings may remain if clearly documented.
+
+Do not treat known unrelated Unity AI, subscription, or MCP messages as TreeShader failures.
+
+Do not attempt to repair unrelated packages unless explicitly requested.
 
 ---
 
@@ -371,13 +482,13 @@ Do not ignore recurring warnings without explaining them.
 
 Visual validation must use the test scene.
 
-When relevant, test the tree under multiple sun directions.
+When relevant, test the tree under multiple Sun directions.
 
 At minimum inspect:
 
 - front lighting
 - side lighting
-- opposite side lighting
+- opposite-side lighting
 - higher sun angle
 - lower sun angle
 
@@ -394,11 +505,38 @@ Check that:
 - materials remain editable
 - silhouette remains readable
 
+For art-direction milestones, also compare:
+
+- palette
+- contrast
+- saturation
+- light/shadow balance
+- perceived softness
+
+against `TargetArtDirection`.
+
+---
+
+# Reference Priority During Validation
+
+When references disagree:
+
+1. Specs define required behaviour.
+2. `TargetArtDirection` defines desired visual appearance.
+3. Technical references define possible techniques.
+
+Do not allow the technical reference to override the target art direction.
+
+For example:
+
+- technical-reference teal shadows do not imply the target must use strong teal
+- technical-reference contrast does not override the softer target palette
+
 ---
 
 # Comparison Testing
 
-When adding an adjustable feature, compare meaningful extremes.
+When adding or refining an adjustable feature, compare meaningful values.
 
 Examples:
 
@@ -428,7 +566,13 @@ For wind:
 
 versus the intended default.
 
+For color calibration:
+
+compare the current material against `TargetArtDirection`.
+
 Use comparisons to verify that each control is actually working.
+
+Do not generate excessive diagnostic permutations if a smaller set clearly validates the feature.
 
 ---
 
@@ -463,15 +607,15 @@ When completing a spec, report:
 
 ## Implemented
 
-Briefly describe what was added.
+Briefly describe what was added or refined.
 
 ## Assets Modified
 
 List relevant asset paths.
 
-## Material Properties Added
+## Material Properties
 
-List new exposed properties.
+List new properties or changed defaults when relevant.
 
 ## Validation
 
@@ -482,10 +626,17 @@ Report:
 - scene tested
 - object tested
 - visual checks performed
+- comparison against relevant target reference when applicable
 
 ## Known Limitations
 
 List any current limitation.
+
+Distinguish:
+
+- intentional current-spec limitations
+- future-spec work
+- infrastructure limitations
 
 ## Next Spec
 
@@ -505,14 +656,18 @@ If the requested feature cannot be implemented correctly because of:
 - inappropriate pivots
 - incorrect source textures
 - render pipeline limitations
-- MCP limitations
 - Unity version differences
+- shader limitations
 
 stop and report the actual constraint.
 
 Do not silently replace the requested approach with a substantially different one.
 
 Propose the smallest practical solution.
+
+For MCP limitations or connectivity failures, follow the dedicated MCP Infrastructure Safety rules above.
+
+Do not attempt infrastructure recovery without explicit user approval.
 
 ---
 
@@ -537,6 +692,16 @@ Do not add:
 unless a specification explicitly requests them.
 
 Keep the implementation focused on the current milestone.
+
+Do not expand a shader-art task into:
+
+- Unity process management
+- MCP server management
+- package repair
+- unrelated Console cleanup
+- project-wide refactors
+
+without explicit user instruction.
 
 ---
 
@@ -575,6 +740,8 @@ Goal:
 Establish the main stylized lighting and artistic color palette.
 
 This is the first major visual target.
+
+Do not advance from Phase 3 until the result is visually reasonably aligned with `TargetArtDirection`.
 
 ## Phase 4 — Depth and Variation
 
@@ -620,10 +787,14 @@ Verify the complete system across lighting angles, assets and material settings.
 
 ---
 
-# Important Rule
+# Important Rules
 
 Never treat "shader compiles" as equivalent to "task complete".
 
 For this project:
 
 visual correctness in Unity is part of the specification.
+
+Use MCP for Unity for Unity-side inspection and validation.
+
+If MCP for Unity fails, stop and report the failure instead of attempting to repair the Editor or MCP infrastructure.
