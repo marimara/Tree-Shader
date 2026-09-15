@@ -31,6 +31,10 @@ Shader "Meganeura/Stylized Foliage"
         _ColorVariationScale ("Color Variation Scale", Range(0.1,4)) = 0.9
         _DistanceStart ("Detail Fade Start", Float) = 15
         _DistanceEnd ("Detail Fade End", Float) = 45
+        _WindDirection ("Wind Direction (World Space)", Vector) = (1,0,0,0)
+        _WindStrength ("Wind Strength", Range(0,1)) = 0.18
+        _WindSpeed ("Wind Speed", Range(0,3)) = 0.65
+        _WindScale ("Wind Scale", Range(0.1,4)) = 0.85
     }
 
     SubShader
@@ -85,6 +89,10 @@ Shader "Meganeura/Stylized Foliage"
             half _ColorVariationScale;
             float _DistanceStart;
             float _DistanceEnd;
+            float4 _WindDirection;
+            half _WindStrength;
+            half _WindSpeed;
+            half _WindScale;
         CBUFFER_END
 
         struct Attributes
@@ -157,6 +165,41 @@ Shader "Meganeura/Stylized Foliage"
             float fadePosition = saturate((cameraDistance - _DistanceStart)
                 / (fadeEnd - _DistanceStart));
             return (half)(1.0 - smoothstep(0.0, 1.0, fadePosition));
+        }
+
+        float3 ApplyFoliageWind(float3 positionOS)
+        {
+            // No authored wind data exists on the foliage mesh. Use the established
+            // canopy volume as a stable procedural mask: the inner mass stays almost
+            // fixed while the outer shell receives progressively more movement.
+            float3 canopyLocal = positionOS - _CanopyCenterOffset.xyz;
+            float3 maskShape = canopyLocal * float3(1.00, 1.20, 1.10);
+            float normalizedRadius = length(maskShape) / max(_InteriorRadius, 0.0001h);
+            half outerMask = smoothstep(0.28h, 1.05h, normalizedRadius);
+
+            float3 positionWS = TransformObjectToWorld(positionOS);
+            float3 windDirectionWS = _WindDirection.xyz;
+            windDirectionWS.y *= 0.35;
+            windDirectionWS = dot(windDirectionWS, windDirectionWS) > 1e-6
+                ? normalize(windDirectionWS) : float3(1.0, 0.0, 0.0);
+
+            // Two broad, incommensurate waves make separated cards and canopy
+            // regions drift out of phase without high-frequency vertex wobble.
+            float spatialPhase = dot(positionWS, float3(0.73, 0.19, 0.51))
+                * _WindScale;
+            float timePhase = _Time.y * _WindSpeed;
+            float primaryWave = sin(spatialPhase + timePhase);
+            float secondaryWave = sin(spatialPhase * 1.73 - timePhase * 0.67 + 1.91);
+            float wave = primaryWave * 0.72 + secondaryWave * 0.28;
+
+            float3 crossDirectionWS = SafeNormalize(cross(float3(0.0, 1.0, 0.0),
+                windDirectionWS));
+            crossDirectionWS = dot(crossDirectionWS, crossDirectionWS) > 1e-6
+                ? crossDirectionWS : float3(0.0, 0.0, 1.0);
+            float3 displacementWS = (windDirectionWS * wave
+                + crossDirectionWS * secondaryWave * 0.12)
+                * (_WindStrength * outerMask * 0.35);
+            return TransformWorldToObject(positionWS + displacementWS);
         }
 
         float3 ApplyNormalNoise(float3 radialOS, float3 positionOS,
@@ -278,7 +321,8 @@ Shader "Meganeura/Stylized Foliage"
             Varyings Vert(Attributes input)
             {
                 Varyings output;
-                VertexPositionInputs positionInputs = GetVertexPositionInputs(input.positionOS.xyz);
+                float3 deformedPositionOS = ApplyFoliageWind(input.positionOS.xyz);
+                VertexPositionInputs positionInputs = GetVertexPositionInputs(deformedPositionOS);
                 VertexNormalInputs normalInputs = GetVertexNormalInputs(
                     input.normalOS, input.tangentOS);
                 output.positionCS = positionInputs.positionCS;
@@ -434,7 +478,8 @@ Shader "Meganeura/Stylized Foliage"
             ShadowVaryings ShadowVert(Attributes input)
             {
                 ShadowVaryings output;
-                float3 positionWS = TransformObjectToWorld(input.positionOS.xyz);
+                float3 deformedPositionOS = ApplyFoliageWind(input.positionOS.xyz);
+                float3 positionWS = TransformObjectToWorld(deformedPositionOS);
                 float3 normalWS = TransformObjectToWorldNormal(input.normalOS);
                 #if _CASTING_PUNCTUAL_LIGHT_SHADOW
                     float3 lightDirectionWS = normalize(_LightPosition - positionWS);
@@ -479,7 +524,8 @@ Shader "Meganeura/Stylized Foliage"
             DepthVaryings DepthVert(Attributes input)
             {
                 DepthVaryings output;
-                output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
+                float3 deformedPositionOS = ApplyFoliageWind(input.positionOS.xyz);
+                output.positionCS = TransformObjectToHClip(deformedPositionOS);
                 output.alphaUV = TRANSFORM_TEX(input.uv, _AlphaMap);
                 return output;
             }
@@ -518,7 +564,8 @@ Shader "Meganeura/Stylized Foliage"
             DepthNormalsVaryings DepthNormalsVert(Attributes input)
             {
                 DepthNormalsVaryings output;
-                output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
+                float3 deformedPositionOS = ApplyFoliageWind(input.positionOS.xyz);
+                output.positionCS = TransformObjectToHClip(deformedPositionOS);
 
                 VertexNormalInputs normalInputs = GetVertexNormalInputs(
                     input.normalOS, input.tangentOS);

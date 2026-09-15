@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: MAT_StylizedFoliage_Test 9
+  m_Shader: {fileID: 4800000, guid: 17f2e7a6e37a3b84485f2ad452c11f8a, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 1
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _AlphaMap:
+        m_Texture: {fileID: 2800000, guid: 6821b3ca8f43baf4981671009494188a, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BaseMap:
+        m_Texture: {fileID: 2800000, guid: 2bcb59ada7b0ea0448f4ac5434b48f0b, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _NormalMap:
+        m_Texture: {fileID: 2800000, guid: 69fe0786e2b5c454f89e4eea1d5b1459, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _AOStrength: 0.375
+    - _AlphaClipThreshold: 0.402
+    - _ColorVariationScale: 0.9
+    - _ColorVariationStrength: 0.27
+    - _DistanceEnd: 45
+    - _DistanceStart: 15
+    - _HeightDarkening: 0.33
+    - _HeightGradientPosition: 0.02
+    - _InteriorRadius: 0.0548
+    - _InteriorStrength: 0.631
+    - _NormalDetailContrast: 0.5
+    - _NormalNoiseScale: 0.75
+    - _NormalNoiseStrength: 0.18
+    - _NormalStrength: 1
+    - _ShadowSoftness: 0.5
+    - _ShadowStrength: 0.7
+    - _ShadowThreshold: 0.5
+    - _StylizedNormalStrength: 1
+    - _WindScale: 0.97
+    - _WindSpeed: 1.01
+    - _WindStrength: 0.261
+    m_Colors:
+    - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
+    - _CanopyCenterOffset: {r: -2.96, g: 0.69, b: 1.73, a: 0}
+    - _DeepShadowColor: {r: 0.8352941, g: 0.2987257, b: 0, a: 1}
+    - _InteriorColor: {r: 0.7647059, g: 0.31627384, b: 0, a: 1}
+    - _LightColor: {r: 1, g: 0.6742852, b: 0, a: 1}
+    - _LightDirectionBias: {r: 0, g: 0, b: 0, a: 0}
+    - _MidColor: {r: 1, g: 0.57910955, b: 0, a: 1}
+    - _ShadowColor: {r: 0.8784314, g: 0.43255824, b: 0, a: 1}
+    - _WindDirection: {r: 0.8, g: 0, b: 0.6, a: 0}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

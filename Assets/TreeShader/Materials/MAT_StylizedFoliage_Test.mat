@@ -55,6 +55,9 @@ Material:
     - _ShadowStrength: 0.7
     - _ShadowThreshold: 0.5
     - _StylizedNormalStrength: 0.742
+    - _WindScale: 0.97
+    - _WindSpeed: 1.01
+    - _WindStrength: 0.231
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _CanopyCenterOffset: {r: 0.014050544, g: -0.0021115066, b: -0.0038637575, a: 0}
@@ -64,5 +67,6 @@ Material:
     - _LightDirectionBias: {r: 0, g: 0, b: 0, a: 0}
     - _MidColor: {r: 0.18, g: 0.55, b: 0.2, a: 1}
     - _ShadowColor: {r: 0.08, g: 0.42, b: 0.2, a: 1}
+    - _WindDirection: {r: 0.8, g: 0, b: 0.6, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
