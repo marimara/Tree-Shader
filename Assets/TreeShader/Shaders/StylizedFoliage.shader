@@ -8,6 +8,8 @@ Shader "Meganeura/Stylized Foliage"
         _AlphaClipThreshold ("Alpha Clip Threshold", Range(0,1)) = 0.5
         _StylizedNormalStrength ("Stylized Normal Strength", Range(0,1)) = 0
         _CanopyCenterOffset ("Canopy Center (Object Space)", Vector) = (0,0,0,0)
+        _NormalNoiseStrength ("Normal Noise Strength", Range(0,1)) = 0.3
+        _NormalNoiseScale ("Normal Noise Scale", Range(0.1,4)) = 0.65
         _ShadowThreshold ("Shadow Threshold", Range(0,1)) = 0.5
         _ShadowSoftness ("Shadow Softness", Range(0,1)) = 0.5
         _ShadowStrength ("Shadow Strength (Stops)", Range(0,4)) = 0.7
@@ -22,6 +24,8 @@ Shader "Meganeura/Stylized Foliage"
         _AOStrength ("AO Strength", Range(0,1)) = 0.35
         _HeightDarkening ("Height Darkening", Range(0,1)) = 0.15
         _HeightGradientPosition ("Height Gradient Position", Range(-1,1)) = -0.05
+        _ColorVariationStrength ("Color Variation Strength", Range(0,1)) = 0.35
+        _ColorVariationScale ("Color Variation Scale", Range(0.1,4)) = 1.1
     }
 
     SubShader
@@ -51,6 +55,8 @@ Shader "Meganeura/Stylized Foliage"
             half _AlphaClipThreshold;
             float4 _CanopyCenterOffset;
             half _StylizedNormalStrength;
+            half _NormalNoiseStrength;
+            half _NormalNoiseScale;
             half _ShadowThreshold;
             half _ShadowSoftness;
             half _ShadowStrength;
@@ -65,6 +71,8 @@ Shader "Meganeura/Stylized Foliage"
             half _AOStrength;
             half _HeightDarkening;
             half _HeightGradientPosition;
+            half _ColorVariationStrength;
+            half _ColorVariationScale;
         CBUFFER_END
 
         struct Attributes
@@ -89,6 +97,54 @@ Shader "Meganeura/Stylized Foliage"
         half SampleLeafAlpha(float2 uv)
         {
             return SAMPLE_TEXTURE2D(_AlphaMap, sampler_AlphaMap, uv).r;
+        }
+
+        // Smooth, static object-space value noise. It is intentionally sampled at
+        // low frequency and never uses screen position, time, or foliage UVs.
+        float HashVariation(float3 cell)
+        {
+            cell = frac(cell * 0.1031);
+            cell += dot(cell, cell.yzx + 33.33);
+            return frac((cell.x + cell.y) * cell.z);
+        }
+
+        float ValueNoise3D(float3 position)
+        {
+            float3 cell = floor(position);
+            float3 local = frac(position);
+            local = local * local * (3.0 - 2.0 * local);
+
+            float x00 = lerp(HashVariation(cell + float3(0, 0, 0)),
+                HashVariation(cell + float3(1, 0, 0)), local.x);
+            float x10 = lerp(HashVariation(cell + float3(0, 1, 0)),
+                HashVariation(cell + float3(1, 1, 0)), local.x);
+            float x01 = lerp(HashVariation(cell + float3(0, 0, 1)),
+                HashVariation(cell + float3(1, 0, 1)), local.x);
+            float x11 = lerp(HashVariation(cell + float3(0, 1, 1)),
+                HashVariation(cell + float3(1, 1, 1)), local.x);
+            return lerp(lerp(x00, x10, local.y), lerp(x01, x11, local.y), local.z);
+        }
+
+        float3 GetCanopyVariationCoordinates(float3 positionOS, half scale)
+        {
+            float3 canopyLocal = positionOS - _CanopyCenterOffset.xyz;
+            return canopyLocal * (scale / max(_InteriorRadius, 0.0001h));
+        }
+
+        float3 ApplyNormalNoise(float3 radialOS, float3 positionOS)
+        {
+            float3 radialDirectionOS = SafeNormalize(radialOS);
+            float3 noisePosition = GetCanopyVariationCoordinates(positionOS,
+                _NormalNoiseScale);
+            float3 noiseVector = float3(
+                ValueNoise3D(noisePosition + float3(11.7, 3.1, 7.9)),
+                ValueNoise3D(noisePosition + float3(2.3, 17.1, 5.4)),
+                ValueNoise3D(noisePosition + float3(6.2, 9.8, 19.3))) - 0.5;
+            // Tangential noise subtly deforms the spherical direction without
+            // pulling the canopy lighting inward or exposing card orientation.
+            noiseVector -= radialDirectionOS * dot(noiseVector, radialDirectionOS);
+            return SafeNormalize(radialDirectionOS
+                + noiseVector * (_NormalNoiseStrength * 0.24h));
         }
 
         half3 SampleArtisticColorRamp(half lightingMask)
@@ -135,6 +191,7 @@ Shader "Meganeura/Stylized Foliage"
                 float3 radialOS = input.positionOS.xyz - _CanopyCenterOffset.xyz;
                 // Only the exact center is undefined; do not clamp small imported meshes.
                 radialOS = dot(radialOS, radialOS) > 1e-20 ? radialOS : input.normalOS;
+                radialOS = ApplyNormalNoise(radialOS, input.positionOS.xyz);
                 output.radialNormalWS = TransformObjectToWorldNormal(radialOS);
                 output.positionOS = input.positionOS.xyz;
                 output.baseUV = TRANSFORM_TEX(input.uv, _BaseMap);
@@ -212,6 +269,18 @@ Shader "Meganeura/Stylized Foliage"
                 detailedColor = lerp(detailedColor,
                     _InteriorColor.rgb * _BaseColor.rgb * detailModulation,
                     interiorAmount);
+
+                // A single broad field adds slight warm/cool and brightness drift.
+                // The bounded channel offsets retain the established palette and
+                // remain subordinate to directional lighting and canopy depth.
+                half colorVariation = ValueNoise3D(GetCanopyVariationCoordinates(
+                    input.positionOS, _ColorVariationScale) + float3(4.7, 13.2, 8.1));
+                colorVariation = (colorVariation * 2.0h - 1.0h)
+                    * _ColorVariationStrength;
+                half3 variationTint = half3(1.0h + colorVariation * 0.12h,
+                    1.0h + colorVariation * 0.05h,
+                    1.0h - colorVariation * 0.08h);
+                detailedColor *= variationTint;
 
                 // Preserve the Spec 005 stop-based shadow control without black multiplication.
                 // Ambient remains palette-tinted and deliberately subordinate to avoid washout.
@@ -339,6 +408,7 @@ Shader "Meganeura/Stylized Foliage"
                 half3 meshNormalWS = TransformObjectToWorldNormal(input.normalOS);
                 float3 radialOS = input.positionOS.xyz - _CanopyCenterOffset.xyz;
                 radialOS = dot(radialOS, radialOS) > 1e-20 ? radialOS : input.normalOS;
+                radialOS = ApplyNormalNoise(radialOS, input.positionOS.xyz);
                 half3 radialWS = TransformObjectToWorldNormal(radialOS);
                 half3 blendedWS = lerp(meshNormalWS, radialWS, _StylizedNormalStrength);
                 output.normalWS = dot(blendedWS, blendedWS) > 1e-8

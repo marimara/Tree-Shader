@@ -35,10 +35,14 @@ Material:
     m_Floats:
     - _AOStrength: 0.35
     - _AlphaClipThreshold: 0.5
+    - _ColorVariationScale: 1.1
+    - _ColorVariationStrength: 0.35
     - _HeightDarkening: 0.15
     - _HeightGradientPosition: -0.05
     - _InteriorRadius: 0.026
     - _InteriorStrength: 0.75
+    - _NormalNoiseScale: 0.65
+    - _NormalNoiseStrength: 0.3
     - _ShadowSoftness: 0.5
     - _ShadowStrength: 0.7
     - _ShadowThreshold: 0.5
