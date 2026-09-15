@@ -1,800 +1,408 @@
-# AGENTS.md
+# AGENTS.md — Stylized Water Shader
 
-## Project Context
+## Scope
 
-This Unity project contains a stylized vegetation shader development task focused on tree foliage built with foliage cards and alpha clipping.
+This file governs all work inside:
 
-The shader should target a highly stylized visual result with:
+Assets/WaterShader/
 
-- soft, readable light and shadow masses
-- rounded canopy volume
-- spherical/radial lighting behaviour
-- saturated artistic shadow colors
-- foliage-card support
-- alpha clipping
-- two-sided rendering
-- controllable color palette
-- subtle normal/detail variation
-- canopy interior darkening
-- optional wind in a later milestone
+The WaterShader module is an isolated stylized water system developed for the current Unity URP project.
 
-The implementation should prioritize artistic control and readability over physically accurate vegetation rendering.
+Do not modify unrelated systems, packages, scenes, shaders, materials, project settings, vegetation assets, grass assets, or files outside Assets/WaterShader unless a Spec explicitly requires it.
 
 ---
 
-# Source of Truth
+# Project Goal
 
-For the Stylized Tree Shader task, the source of truth is:
+Create a stylized water system capable of representing the same visual language across:
 
-`Assets/TreeShader/Specs/`
+- waterfalls;
+- fast rivers;
+- slow rivers;
+- transitions from flowing water into calm water;
+- lakes and other mostly still water.
 
-The specifications must be read in numerical order.
+The core visual goal is not physical realism.
 
-Current spec order:
+The shader should look graphic, painterly, readable and stylized.
 
-1. `001-project-goal.md`
-2. `002-test-scene.md`
-3. `003-foliage-foundation.md`
-4. `004-radial-normals.md`
-5. `005-stylized-lighting.md`
-6. `006-color-system.md`
-7. `007-canopy-depth.md`
-8. `008-detail-variation.md`
-9. `009-normal-map-integration.md`
-10. `010-distance-behaviour.md`
-11. `011-wind.md`
-12. `012-validation.md`
+Primary visual inspiration is stored in:
 
-Do not skip ahead.
+Assets/WaterShader/References/
 
-Do not implement features from later specs unless the current spec explicitly requires them.
+Read:
 
-If a later feature would make the current implementation cleaner, document the idea but do not implement it yet.
+Assets/WaterShader/References/REF_Links.md
+
+before making major visual decisions.
 
 ---
 
-# Visual References
+# Core Design Principle
 
-Visual references are stored in:
+Flow must influence both:
 
-`Assets/TreeShader/References/`
+1. animation;
+2. appearance.
 
-Use them as artistic guidance.
+Water must not simply use the same texture at different speeds.
 
-The references have different purposes.
+As flow becomes stronger, the surface should progressively support:
 
-## Technical Reference
+- faster movement;
+- stronger directional stretching;
+- more visible directional patterns;
+- greater turbulence;
+- eventually stronger foam and waterfall effects.
 
-The technical reference demonstrates ideas such as:
+As flow approaches zero, the water should progressively become:
 
-- radial/spherical normals
-- fake Lambert lighting
-- foliage-card shading
-- stylized sun response
-- custom color mixing
-- fake canopy density
-- AO-like interior shading
-- normal variation
-- distance-based detail control
+- slower;
+- broader in pattern;
+- less directional;
+- less turbulent;
+- visually calmer.
 
-Use these ideas as technical inspiration.
+The intended progression is:
 
-Do not attempt to reproduce the reference shader line-for-line.
+Waterfall -> Rapids -> River -> Calm Lake
 
-Do not use the technical reference as the primary color target.
-
-## Target Art Direction
-
-The target art reference defines the desired visual result.
-
-Prioritize:
-
-- soft light transitions
-- bright exposed foliage
-- saturated green midtones
-- cool green shadows
-- darker but still colorful canopy regions
-- rounded foliage volumes
-- readable large-scale lighting
-- stylized rather than realistic appearance
-
-The target art reference has higher priority than the technical reference when evaluating:
-
-- palette
-- contrast
-- saturation
-- perceived softness
-- overall art direction
-
-Do not copy reference colors literally.
-
-Material properties should allow the artist to recreate or alter the palette.
+These states should belong to the same visual system.
 
 ---
 
-# MCP for Unity Usage
+# Shader Technology
 
-Use the installed **MCP for Unity** integration whenever interaction with the live Unity Editor or project state is required.
+The main water shader must be implemented as a handwritten URP shader.
 
-Use it to:
+Do not use Shader Graph for the main water implementation.
 
-- inspect the current project hierarchy
-- inspect scene contents
-- inspect existing assets
-- inspect imported models
-- inspect materials
-- inspect shaders
-- inspect render pipeline configuration
-- inspect the Unity Console
-- open or inspect the shader test scene
-- apply or inspect test materials
-- verify shader compilation
-- verify the visual result
-- save modified assets and scenes when supported
+Primary shader:
 
-Do not assume project state.
+Assets/WaterShader/Shaders/StylizedWater.shader
 
-Inspect it before making changes.
+Reusable shader logic may gradually be extracted into:
 
-Do not switch between multiple Unity MCP integrations during the same task unless explicitly requested by the user.
+Assets/WaterShader/Shaders/Includes/
+
+Use .hlsl include files only when the amount of logic justifies separating it.
+
+Do not prematurely create many empty or unnecessary include files.
 
 ---
 
-# Unity Editor Session Rules
+# Shader Architecture
 
-Use the Unity Editor instance that is already open for this project.
+The main shader should remain readable.
 
-Do not manage Unity processes as part of normal shader development.
+Long reusable systems should eventually be separated by responsibility.
 
-Unless explicitly approved by the user, do NOT:
+Likely future modules include:
 
-- launch another Unity Editor instance
-- close the currently open Unity Editor
-- restart Unity
-- kill Unity processes
-- terminate Unity from the command line
-- remove or modify `Temp/UnityLockfile`
-- assume a Unity lock file represents a stale process
-- modify Unity Hub state
-- force a project reload to repair MCP connectivity
+- WaterCommon.hlsl
+- WaterDepth.hlsl
+- WaterFlow.hlsl
+- WaterPatterns.hlsl
+- WaterFoam.hlsl
+- WaterNormals.hlsl
+- WaterWaves.hlsl
+- WaterLighting.hlsl
 
-The Unity Editor lifecycle belongs to the user.
-
----
-
-# MCP Infrastructure Safety
-
-MCP connectivity problems are infrastructure problems, not shader-development tasks.
-
-If MCP for Unity becomes unavailable, disconnected, stale, or unable to inspect the currently open Editor:
-
-1. Do not modify MCP infrastructure.
-2. Do not start another MCP server.
-3. Do not stop an MCP server.
-4. Do not restart or reconfigure an MCP server.
-5. Do not manually bind MCP services to ports.
-6. Do not launch replacement HTTP/WebSocket servers.
-7. Do not restart Unity.
-8. Do not kill Unity processes.
-9. Do not delete lock files.
-
-Stop the current implementation attempt and report:
-
-- that MCP for Unity is unavailable
-- the last successful operation
-- the failed operation
-- whether code/assets were already modified
-- whether Unity-side validation remains incomplete
-
-Then wait for user instruction.
-
-Do not spend task time debugging MCP infrastructure unless explicitly asked to do so.
+These names are architectural guidance, not mandatory files to create immediately.
 
 ---
 
-# Temporary Diagnostic Files
+# Development Method
 
-Do not place infrastructure logs, MCP diagnostics, temporary server logs, process dumps, or unrelated debugging output inside `Assets/`.
+Development is Spec-driven.
 
-Unity automatically imports files under `Assets/`, which may generate unnecessary reimports and Console noise.
+Each Spec must:
 
-If temporary external diagnostics are explicitly required, keep them outside the Unity project's `Assets/` folder.
+1. introduce a small, clearly defined capability;
+2. preserve previous validated behavior;
+3. include explicit validation criteria;
+4. avoid implementing unrelated future features;
+5. keep the project compiling;
+6. leave the technical test scene usable.
 
-Do not create diagnostic artifacts unless necessary for the current specification.
+Do not jump ahead to later Specs.
 
----
-
-# Before Starting Any Spec
-
-Before implementing a specification:
-
-1. Read this `AGENTS.md`.
-2. Read `001-project-goal.md`.
-3. Read the current specification.
-4. Read earlier specifications only as needed to understand validated existing systems.
-5. Inspect the current Unity project through MCP for Unity.
-6. Inspect existing TreeShader assets before creating new ones.
-7. Inspect the Console before starting.
-8. Confirm that the previous milestone is still functional.
-
-Do not create duplicate shaders, materials, folders, scenes or scripts when an appropriate asset already exists.
-
-Do not repeatedly reread every previous specification if the current project state and required dependency are already clear.
+If a future feature would require large structural changes, document that need instead of silently implementing it early.
 
 ---
 
-# Development Strategy
+# Technical Test Scene
 
-Work incrementally.
+All primary development and validation must happen in:
 
-Prefer small, reversible changes.
+Assets/WaterShader/Scenes/WaterShader_TestScene.unity
 
-Do not attempt to implement the complete stylized foliage shader in a single step.
+Do not use the project's main environment scene as the primary development scene.
 
-Each specification represents a milestone.
+The test scene should remain lightweight and technical.
 
-Preserve already validated behaviour when implementing new systems.
+Its purpose is to make shader behavior easy to inspect.
+
+The test scene may eventually contain:
+
+- Lake_Test;
+- River_Test;
+- Waterfall_Test;
+- transition meshes;
+- test rocks;
+- ground;
+- lighting;
+- camera;
+- debug objects.
+
+Do not decorate the scene beyond what is needed for validation.
+
+---
+
+# References
+
+Files inside:
+
+Assets/WaterShader/References/
+
+are read-only references.
+
+Do not:
+
+- rename them;
+- modify them;
+- reimport them with destructive changes;
+- move them;
+- overwrite them.
+
+The commercial/reference shader must not be copied or reverse-engineered.
+
+Use references only to understand:
+
+- visual language;
+- motion;
+- shape language;
+- foam distribution;
+- color relationships;
+- transition between moving and calm water.
+
+---
+
+# Materials
+
+Water materials belong in:
+
+Assets/WaterShader/Materials/
+
+Use clear names.
 
 Examples:
 
-- Spec 004 must not break alpha clipping from Spec 003.
-- Spec 005 must not break radial normals from Spec 004.
-- Spec 006 must not break the stylized lighting response from Spec 005.
-- Spec 009 must not destroy large-scale canopy shading established by Specs 004 and 005.
-- Spec 011 must not break lighting, alpha, shadows or silhouette.
+MAT_Water_Test
+MAT_Water_Lake
+MAT_Water_River
+MAT_Water_Waterfall
 
-Do not rewrite working shader systems without a clear technical reason.
-
-If only calibration is required, prefer calibration over architectural rewriting.
+Avoid creating duplicate materials without a clear purpose.
 
 ---
 
-# Source Asset Safety
+# Textures
 
-Imported source tree assets must be treated as read-only reference assets whenever possible.
+Water textures belong in:
 
-Do not destructively modify the original imported tree files.
+Assets/WaterShader/Textures/
 
-Prefer:
+Create subfolders only when needed.
 
-- material overrides
-- prefab instances
-- duplicated test assets
-- new materials
-- new shaders
-- separate test scenes
-- non-destructive import settings
+Expected future categories include:
 
-If the source model requires structural changes, report the issue before modifying it.
+- Flow
+- Foam
+- Normals
+- Masks
+- Gradients
 
-Do not silently edit the original mesh.
+Do not import random texture assets without documenting their purpose.
 
----
-
-# Test Assets
-
-The shader development should use the dedicated TreeShader test setup.
-
-Expected locations:
-
-`Assets/TreeShader/Test/`
-
-`Assets/TreeShader/Materials/`
-
-`Assets/TreeShader/Shaders/`
-
-The main test scene should be:
-
-`Assets/TreeShader/Test/TreeShader_TestScene.unity`
-
-If the scene does not exist yet, create it according to `002-test-scene.md`.
-
-Use the imported tree asset intended for testing, preferably `tree1` unless project state indicates a better existing choice.
-
-When available, also use a foliage-only mesh such as `leaves1`.
-
-Do not replace validated test assets unnecessarily.
+Prefer procedural shader logic where practical, but do not force procedural solutions when a small authored texture produces a significantly better stylized result.
 
 ---
 
-# Shader Design Rules
+# Meshes
 
-The shader must be designed primarily for foliage cards.
+Water-specific test meshes belong in:
 
-It should support:
+Assets/WaterShader/Meshes/
 
-- alpha clipping
-- two-sided foliage
-- alpha-clipped shadow casting
-- URP Main Light
-- realtime shadows
-- stylized lighting
-- radial/spherical normal behaviour
-- artist-controlled color transitions
-- optional normal-map detail
-- optional variation
-- optional wind
+Do not modify unrelated imported environment meshes.
 
-Avoid relying on realistic PBR behaviour as the primary visual model.
+For early Specs, simple Unity primitives or simple generated meshes are preferred.
+
+---
+
+# Validation
+
+Validation output belongs in:
+
+Assets/WaterShader/Validation/
+
+When useful, organize validation by Spec:
+
+Validation/
+    SPEC-001/
+    SPEC-002/
+    ...
+
+Validation may contain:
+
+- screenshots;
+- comparison images;
+- short videos;
+- debug captures.
+
+Do not delete validation from previous Specs unless explicitly requested.
+
+---
+
+# Flow System
+
+The long-term water system is expected to support:
+
+- flow direction;
+- flow speed / flow strength;
+- painterly directional patterns;
+- transitions between fast and calm water;
+- eventually flow maps.
+
+Do not assume that UV direction alone will be sufficient for the final river system.
+
+However, early Specs may use a simple uniform flow direction before Flow Maps are introduced.
+
+---
+
+# Flow Map Direction
+
+The intended future Flow Map convention is:
+
+R = Flow X
+G = Flow Y
+B = Flow Strength
+A = optional turbulence / foam data
+
+This convention may be revised by a future Spec if technical testing shows a better format.
+
+Do not implement the full Flow Map system before the relevant Spec.
+
+---
+
+# Visual Style
+
+Target visual characteristics:
+
+- saturated cyan / turquoise water;
+- readable large shapes;
+- painterly or brush-like streaks;
+- strong directional motion in flowing water;
+- smooth broad shapes in calm water;
+- graphic highlights;
+- stylized white foam;
+- minimal dependence on physically realistic water behavior.
 
 Avoid:
 
-- black shadow multiplication
-- excessive specular highlights
-- physically accurate subsurface scattering unless explicitly required later
-- per-leaf lighting noise dominating the canopy
-- unnecessary shader complexity
-- unnecessary texture samples
-- unnecessary branching
-- hidden hard-coded artistic constants
-
-Important artistic controls should be exposed through the material.
-
-Internal implementation details do not need to be exposed.
+- noisy realistic ocean water;
+- excessive micro-detail;
+- physically accurate simulation for its own sake;
+- overly glossy transparent glass-like water;
+- generic realistic PBR water appearance.
 
 ---
 
-# Lighting Rules
+# Performance
 
-The Main Directional Light should drive the large-scale foliage lighting.
-
-Do not fake all lighting independently of the scene unless the current spec explicitly requires it.
-
-Stylized lighting should use the scene light as input while allowing artistic remapping.
-
-Large-scale canopy shading is more important than physically accurate leaf response.
-
-The intended hierarchy is:
-
-1. canopy volume
-2. light/shadow mass
-3. artistic color
-4. foliage detail
-
-Do not allow small-scale leaf detail to overpower the first three.
-
----
-
-# Radial / Spherical Normals
-
-When implementing or maintaining stylized normals:
-
-- treat the foliage canopy as a larger rounded volume
-- avoid exposing individual foliage-card orientation
-- keep calculations stable under object translation and rotation
-- prefer object-space calculations when practical
-- document limitations involving non-uniform scale if they exist
-- expose artistic control over the blend between mesh normals and stylized normals
-
-The goal is visual coherence, not mathematical purity.
-
----
-
-# Artistic Calibration Rules
-
-When a specification is technically functional but visually distant from `TargetArtDirection`, refine the current specification before advancing.
-
-Do not rely on later specifications to fix problems that belong to the current milestone.
-
-Examples:
-
-If Spec 006 currently produces:
-
-- excessive lime highlights
-- overly teal deep shadows
-- excessive contrast
-- overly aggressive BaseMap luminance variation
-
-those should be refined within Spec 006 before advancing to Spec 007.
-
-Later systems must not be used to hide unresolved art-direction problems in earlier systems.
-
----
-
-# Material Property Rules
-
-Property names should be clear and artist-friendly.
-
-Prefer names such as:
-
-- `_BaseMap`
-- `_AlphaMap`
-- `_BaseColor`
-- `_AlphaClipThreshold`
-- `_StylizedNormalStrength`
-- `_CanopyCenterOffset`
-- `_ShadowThreshold`
-- `_ShadowSoftness`
-- `_ShadowStrength`
-- `_LightDirectionBias`
-- `_LightColor`
-- `_MidColor`
-- `_ShadowColor`
-- `_DeepShadowColor`
-- `_InteriorStrength`
-- `_AOStrength`
-- `_NormalMap`
-- `_NormalStrength`
-- `_NormalNoiseStrength`
-- `_ColorVariationStrength`
-- `_WindStrength`
-
-Do not expose redundant properties.
-
-Remove obsolete properties when appropriate.
-
-Do not rename established public properties casually once materials depend on them.
-
----
-
-# Validation Rules
-
-A specification is not complete merely because code was written.
-
-A specification is not complete merely because the shader compiles.
-
-Every milestone must be validated in Unity through MCP for Unity.
-
-After implementing a spec:
-
-1. Save all modified assets.
-2. Save modified scenes when required.
-3. Allow Unity to import and compile.
-4. Inspect the Unity Console.
-5. Fix shader compilation errors.
-6. Fix material/property errors.
-7. Open or inspect `TreeShader_TestScene`.
-8. Apply or inspect the current test material.
-9. Visually inspect the feature.
-10. Verify previously completed features still work.
-11. Compare against the relevant visual reference.
-12. Report the result.
-
-Do not declare completion before visual validation.
-
-If MCP for Unity is unavailable, visual validation is incomplete.
-
----
-
-# Console Requirements
-
-At the end of a milestone, there should be no new errors caused by the TreeShader work.
-
-Specifically verify:
-
-- zero shader compilation errors
-- zero missing material property errors
-- zero broken shader references
-- zero missing texture references caused by the implementation
-- zero exceptions introduced by TreeShader tooling or test setup
-
-Warnings should be reviewed.
-
-Known unrelated warnings may remain if clearly documented.
-
-Do not treat known unrelated Unity AI, subscription, or MCP messages as TreeShader failures.
-
-Do not attempt to repair unrelated packages unless explicitly requested.
-
----
-
-# Visual Validation
-
-Visual validation must use the test scene.
-
-When relevant, test the tree under multiple Sun directions.
-
-At minimum inspect:
-
-- front lighting
-- side lighting
-- opposite-side lighting
-- higher sun angle
-- lower sun angle
-
-Check that:
-
-- foliage cards remain visually hidden as individual planes
-- the canopy reads as a coherent volume
-- alpha clipping remains clean
-- backfaces remain visible when required
-- cast shadows use the foliage alpha
-- shadows remain colored rather than black
-- the tree does not unexpectedly darken
-- lighting transitions remain stable
-- materials remain editable
-- silhouette remains readable
-
-For art-direction milestones, also compare:
-
-- palette
-- contrast
-- saturation
-- light/shadow balance
-- perceived softness
-
-against `TargetArtDirection`.
-
----
-
-# Reference Priority During Validation
-
-When references disagree:
-
-1. Specs define required behaviour.
-2. `TargetArtDirection` defines desired visual appearance.
-3. Technical references define possible techniques.
-
-Do not allow the technical reference to override the target art direction.
-
-For example:
-
-- technical-reference teal shadows do not imply the target must use strong teal
-- technical-reference contrast does not override the softer target palette
-
----
-
-# Comparison Testing
-
-When adding or refining an adjustable feature, compare meaningful values.
-
-Examples:
-
-For stylized normals:
-
-`_StylizedNormalStrength = 0`
-
-versus:
-
-`_StylizedNormalStrength = 1`
-
-For normal maps:
-
-`_NormalStrength = 0`
-
-versus a visible but reasonable value.
-
-For canopy interior darkening:
-
-`_InteriorStrength = 0`
-
-versus the configured default.
-
-For wind:
-
-`_WindStrength = 0`
-
-versus the intended default.
-
-For color calibration:
-
-compare the current material against `TargetArtDirection`.
-
-Use comparisons to verify that each control is actually working.
-
-Do not generate excessive diagnostic permutations if a smaller set clearly validates the feature.
-
----
-
-# Performance Guidelines
-
-Keep the shader appropriate for realtime vegetation.
+The shader should remain practical for a real-time Unity game.
 
 Prefer:
 
-- simple vector math
-- smoothstep/remap operations
-- inexpensive procedural masks
-- minimal texture samples
-- vertex-stage work where appropriate
+- reusable calculations;
+- minimal unnecessary texture samples;
+- simple configurable features;
+- predictable shader variants.
 
-Avoid:
+Do not optimize prematurely if doing so would obscure correctness.
 
-- loops in fragment shading
-- expensive ray-based thickness calculations
-- unnecessarily complex noise
-- multiple redundant normal conversions
-- excessive dynamic branching
-- features with no visible artistic benefit
-
-Do not prematurely optimize at the cost of correctness, but avoid obviously wasteful implementation.
+First make each system correct and visually understandable, then optimize it in a later Spec.
 
 ---
 
-# Spec Completion Report
+# URP Compatibility
 
-When completing a spec, report:
+The shader must follow the URP setup already used by the project.
 
-## Implemented
+Do not modify:
 
-Briefly describe what was added or refined.
+- render pipeline assets;
+- renderer configuration;
+- global project graphics settings;
+- package versions;
 
-## Assets Modified
+unless a Spec explicitly requires it.
 
-List relevant asset paths.
+If a desired feature requires a project-level URP setting, stop and report the requirement before changing it.
 
-## Material Properties
+---
 
-List new properties or changed defaults when relevant.
+# Editing Existing Files
 
-## Validation
+Before replacing existing shader behavior:
 
-Report:
+1. inspect the current implementation;
+2. preserve validated features;
+3. identify which Spec introduced them;
+4. make the smallest reasonable change.
 
-- compilation status
-- Console status
-- scene tested
-- object tested
-- visual checks performed
-- comparison against relevant target reference when applicable
+Do not rewrite the entire shader simply because a new feature is being added.
 
-## Known Limitations
+---
 
-List any current limitation.
+# Debugging
 
-Distinguish:
+Temporary debug modes are encouraged when they make shader data easier to understand.
 
-- intentional current-spec limitations
-- future-spec work
-- infrastructure limitations
+Useful future debug outputs may include:
 
-## Next Spec
+- flow direction;
+- flow strength;
+- depth;
+- painterly pattern;
+- foam mask;
+- normals.
 
-State which specification should be implemented next.
-
-Do not begin the next spec unless explicitly requested.
+Debug functionality should be removable or disabled in normal material use.
 
 ---
 
 # Failure Handling
 
-If the requested feature cannot be implemented correctly because of:
+If Unity, MCP, compilation, scene loading, or another required development tool becomes unavailable:
 
-- mesh structure
-- missing UV data
-- missing vertex data
-- inappropriate pivots
-- incorrect source textures
-- render pipeline limitations
-- Unity version differences
-- shader limitations
+- stop;
+- report what succeeded;
+- report what remains unvalidated;
+- do not attempt unrelated infrastructure repair unless requested.
 
-stop and report the actual constraint.
-
-Do not silently replace the requested approach with a substantially different one.
-
-Propose the smallest practical solution.
-
-For MCP limitations or connectivity failures, follow the dedicated MCP Infrastructure Safety rules above.
-
-Do not attempt infrastructure recovery without explicit user approval.
+Never claim visual validation when the scene could not actually be inspected.
 
 ---
 
-# Scope Control
+# Completion Standard
 
-Do not add unrelated features.
+A Spec is complete only when:
 
-Do not add:
-
-- seasons
-- snow
-- rain
-- interaction bending
-- complex translucency
-- GPU instancing systems
-- LOD generation
-- SpeedTree integration
-- terrain integration
-- global wind managers
-- custom editors
-
-unless a specification explicitly requests them.
-
-Keep the implementation focused on the current milestone.
-
-Do not expand a shader-art task into:
-
-- Unity process management
-- MCP server management
-- package repair
-- unrelated Console cleanup
-- project-wide refactors
-
-without explicit user instruction.
-
----
-
-# Current Workflow
-
-The intended implementation sequence is:
-
-## Phase 1 — Foundation
-
-`001-project-goal.md`
-
-`002-test-scene.md`
-
-`003-foliage-foundation.md`
-
-Goal:
-
-Correct foliage cards, alpha clipping, two-sided rendering and leaf-shaped shadows.
-
-## Phase 2 — Canopy Form
-
-`004-radial-normals.md`
-
-Goal:
-
-Make the foliage read as rounded canopy volumes instead of independent planes.
-
-## Phase 3 — Main Art Direction
-
-`005-stylized-lighting.md`
-
-`006-color-system.md`
-
-Goal:
-
-Establish the main stylized lighting and artistic color palette.
-
-This is the first major visual target.
-
-Do not advance from Phase 3 until the result is visually reasonably aligned with `TargetArtDirection`.
-
-## Phase 4 — Depth and Variation
-
-`007-canopy-depth.md`
-
-`008-detail-variation.md`
-
-Goal:
-
-Add interior depth and controlled natural variation without losing the main canopy shape.
-
-## Phase 5 — Fine Surface Detail
-
-`009-normal-map-integration.md`
-
-Goal:
-
-Restore small leaf-surface detail while preserving stylized canopy lighting.
-
-## Phase 6 — Distance Refinement
-
-`010-distance-behaviour.md`
-
-Goal:
-
-Reduce unnecessary fine detail at distance and maintain visual stability.
-
-## Phase 7 — Animation
-
-`011-wind.md`
-
-Goal:
-
-Add subtle foliage movement after the static appearance is validated.
-
-## Phase 8 — Final Validation
-
-`012-validation.md`
-
-Goal:
-
-Verify the complete system across lighting angles, assets and material settings.
-
----
-
-# Important Rules
-
-Never treat "shader compiles" as equivalent to "task complete".
-
-For this project:
-
-visual correctness in Unity is part of the specification.
-
-Use MCP for Unity for Unity-side inspection and validation.
-
-If MCP for Unity fails, stop and report the failure instead of attempting to repair the Editor or MCP infrastructure.
+- requested files exist;
+- Unity compiles without new shader/script errors;
+- previous validated features still work;
+- current acceptance criteria are met;
+- the WaterShader test scene remains usable;
+- no unrelated files were modified.
