@@ -8,6 +8,8 @@ O sinal mistura a cor já produzida pela rampa artística da Spec 006 com `_Inte
 
 Um gradiente vertical sutil em espaço local contribui apenas perto do corpo da copa. O shader também lê o Screen Space Ambient Occlusion do URP quando `_SCREEN_SPACE_OCCLUSION` está disponível. O AO acrescenta uma pequena contribuição ao tint interno, ponderada pela densidade existente, em vez de multiplicar a árvore em direção ao preto.
 
+Na revisão de `_AOStrength`, foi adicionado um pass alpha-clipped `DepthNormalsOnly`, necessário porque o renderer atual calcula SSAO a partir de Depth Normals. O sinal de AO é remapeado e composto somente no headroom restante após fake density e height darkening; assim ele não é perdido por saturação da soma, mas continua subordinado ao volume procedural.
+
 Nenhum sistema da Spec 008 ou posterior foi implementado.
 
 ## Assets modificados
@@ -39,6 +41,8 @@ Nenhum sistema da Spec 008 ou posterior foi implementado.
 - O interior continua verde colorido e com detalhe legível; não vira preto nem forma um bloco circular sólido.
 - Sun testado em frente `(45,325,0)`, lateral `(45,55,0)`, direção oposta `(45,235,0)`, alto `(80,325,0)` e baixo `(10,325,0)`; restaurado para `(45,325,0)`.
 - O renderer `PC_Renderer` possui `ScreenSpaceAmbientOcclusion` ativo, portanto o caminho de AO foi exercitado na cena.
+- Antes do novo `DepthNormalsOnly`, a keyword `_SCREEN_SPACE_OCCLUSION` estava ativa, mas `aoOcclusion` permanecia praticamente zero, inclusive numa visualização ampliada 8x. Após o pass, a visualização direta mostrou variação clara nas sobreposições e cavidades da folhagem.
+- `_AOStrength = 0`, `0.5` e `1` foram comparados na mesma câmera e iluminação. `0` remove apenas o SSAO; `0.5` acrescenta profundidade moderada; `1` torna os bolsões internos claramente mais definidos sem transformar o verde em preto. O valor material foi restaurado para `0.35`.
 - `_AlphaClipThreshold = 0.95` confirmou recorte de folhas e sombras. O pass `ShadowCaster`, o pass `DepthOnly` e `Cull Off` não foram modificados.
 - `_StylizedNormalStrength = 0/1` continua alterando claramente a leitura card-by-card versus volume radial; o valor final foi restaurado para `1`.
 - `_ShadowStrength = 0/0.7` continua alterando a exposição de sombra sem quebrar a rampa; o valor final foi restaurado para `0.7`.
@@ -55,7 +59,7 @@ O resultado se aproxima do princípio visual da referência: bordas e folhagem e
 - O fake density usa um único centro e raio por material. Copas compostas por volumes muito separados podem exigir materiais/centros distintos.
 - O viés vertical usa o eixo Z local, que é o eixo vertical do source asset atual. Assets com convenção de eixo diferente exigem adaptação da orientação do objeto ou do shader.
 - As limitações já documentadas para escala não uniforme e centro radial continuam válidas.
-- O SSAO só contribui quando a feature e a keyword do URP estão disponíveis; sem elas, o termo retorna neutro e o fake density continua funcional.
+- O SSAO só contribui quando a feature, a keyword e a textura de Depth Normals do URP estão disponíveis; sem elas, o termo retorna neutro e o fake density continua funcional.
 - A direção completamente oposta ainda produz a grande massa sombreada esperada da Spec 006; a Spec 007 não recalibra essa paleta nem a iluminação anterior.
 
 ## Próxima Spec

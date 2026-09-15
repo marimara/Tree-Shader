@@ -200,12 +200,15 @@ Shader "Meganeura/Stylized Foliage"
                     GetNormalizedScreenSpaceUV(input.positionCS));
                 half aoOcclusion = 1.0h - min(aoFactor.directAmbientOcclusion,
                     aoFactor.indirectAmbientOcclusion);
-                // AO adds a restrained color cue and is weighted toward already dense
-                // foliage instead of multiplying final RGB toward black.
-                half aoInterior = aoOcclusion * _AOStrength *
-                    lerp(0.15h, 0.45h, radialInterior);
-                half interiorAmount = saturate(radialInterior * _InteriorStrength
-                    + heightInterior * _HeightDarkening + aoInterior);
+                half baseInterior = saturate(radialInterior * _InteriorStrength
+                    + heightInterior * _HeightDarkening);
+                // Remap the renderer's soft SSAO signal into a readable artistic cue.
+                // Compositing into the remaining headroom prevents early saturation,
+                // while the density weighting keeps AO subordinate to fake density.
+                half aoDepthCue = smoothstep(0.02h, 0.45h, aoOcclusion);
+                half aoWeight = aoDepthCue * _AOStrength *
+                    lerp(0.12h, 0.38h, smoothstep(0.05h, 0.75h, baseInterior));
+                half interiorAmount = baseInterior + (1.0h - baseInterior) * aoWeight;
                 detailedColor = lerp(detailedColor,
                     _InteriorColor.rgb * _BaseColor.rgb * detailModulation,
                     interiorAmount);
@@ -303,6 +306,59 @@ Shader "Meganeura/Stylized Foliage"
             {
                 clip(SampleLeafAlpha(input.alphaUV) - _AlphaClipThreshold);
                 return 0;
+            }
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "DepthNormalsOnly"
+            Tags { "LightMode"="DepthNormalsOnly" }
+
+            ZWrite On
+            Cull Off
+
+            HLSLPROGRAM
+            #pragma target 3.0
+            #pragma vertex DepthNormalsVert
+            #pragma fragment DepthNormalsFrag
+            #pragma multi_compile_fragment _ _GBUFFER_NORMALS_OCT
+
+            struct DepthNormalsVaryings
+            {
+                float4 positionCS : SV_POSITION;
+                half3 normalWS : TEXCOORD0;
+                float2 alphaUV : TEXCOORD1;
+            };
+
+            DepthNormalsVaryings DepthNormalsVert(Attributes input)
+            {
+                DepthNormalsVaryings output;
+                output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
+
+                half3 meshNormalWS = TransformObjectToWorldNormal(input.normalOS);
+                float3 radialOS = input.positionOS.xyz - _CanopyCenterOffset.xyz;
+                radialOS = dot(radialOS, radialOS) > 1e-20 ? radialOS : input.normalOS;
+                half3 radialWS = TransformObjectToWorldNormal(radialOS);
+                half3 blendedWS = lerp(meshNormalWS, radialWS, _StylizedNormalStrength);
+                output.normalWS = dot(blendedWS, blendedWS) > 1e-8
+                    ? normalize(blendedWS) : normalize(radialWS);
+                output.alphaUV = TRANSFORM_TEX(input.uv, _AlphaMap);
+                return output;
+            }
+
+            half4 DepthNormalsFrag(DepthNormalsVaryings input) : SV_Target
+            {
+                clip(SampleLeafAlpha(input.alphaUV) - _AlphaClipThreshold);
+
+                #if defined(_GBUFFER_NORMALS_OCT)
+                    float2 octNormalWS = PackNormalOctQuadEncode(normalize(input.normalWS));
+                    float2 remappedOctNormalWS = saturate(octNormalWS * 0.5 + 0.5);
+                    half3 packedNormalWS = PackFloat2To888(remappedOctNormalWS);
+                    return half4(packedNormalWS, 0.0h);
+                #else
+                    return half4(NormalizeNormalPerPixel(input.normalWS), 0.0h);
+                #endif
             }
             ENDHLSL
         }
