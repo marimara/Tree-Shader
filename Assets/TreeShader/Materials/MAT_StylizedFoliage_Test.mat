@@ -31,6 +31,10 @@ Material:
         m_Texture: {fileID: 2800000, guid: a713ad691a9025445a60639c7b85a29c, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _NormalMap:
+        m_Texture: {fileID: 2800000, guid: ec40ec0a3f3ef084dae99eec167fcda6, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
     - _AOStrength: 0.35
@@ -43,10 +47,11 @@ Material:
     - _InteriorStrength: 0.75
     - _NormalNoiseScale: 0.75
     - _NormalNoiseStrength: 0.18
+    - _NormalStrength: 1
     - _ShadowSoftness: 0.5
     - _ShadowStrength: 0.7
     - _ShadowThreshold: 0.5
-    - _StylizedNormalStrength: 1
+    - _StylizedNormalStrength: 0.72
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _CanopyCenterOffset: {r: 0.014050544, g: -0.0021115066, b: -0.0038637575, a: 0}

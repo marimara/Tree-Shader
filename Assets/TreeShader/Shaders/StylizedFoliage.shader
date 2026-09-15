@@ -4,9 +4,11 @@ Shader "Meganeura/Stylized Foliage"
     {
         _BaseMap ("Base Map", 2D) = "white" {}
         _AlphaMap ("Alpha Map", 2D) = "white" {}
+        [Normal] _NormalMap ("Normal Map", 2D) = "bump" {}
         _BaseColor ("Base Color", Color) = (1,1,1,1)
         _AlphaClipThreshold ("Alpha Clip Threshold", Range(0,1)) = 0.5
         _StylizedNormalStrength ("Stylized Normal Strength", Range(0,1)) = 0
+        _NormalStrength ("Normal Strength", Range(0,1)) = 0.35
         _CanopyCenterOffset ("Canopy Center (Object Space)", Vector) = (0,0,0,0)
         _NormalNoiseStrength ("Normal Noise Strength", Range(0,1)) = 0.18
         _NormalNoiseScale ("Normal Noise Scale", Range(0.1,4)) = 0.75
@@ -47,14 +49,18 @@ Shader "Meganeura/Stylized Foliage"
         SAMPLER(sampler_BaseMap);
         TEXTURE2D(_AlphaMap);
         SAMPLER(sampler_AlphaMap);
+        TEXTURE2D(_NormalMap);
+        SAMPLER(sampler_NormalMap);
 
         CBUFFER_START(UnityPerMaterial)
             float4 _BaseMap_ST;
             float4 _AlphaMap_ST;
+            float4 _NormalMap_ST;
             half4 _BaseColor;
             half _AlphaClipThreshold;
             float4 _CanopyCenterOffset;
             half _StylizedNormalStrength;
+            half _NormalStrength;
             half _NormalNoiseStrength;
             half _NormalNoiseScale;
             half _ShadowThreshold;
@@ -79,6 +85,7 @@ Shader "Meganeura/Stylized Foliage"
         {
             float4 positionOS : POSITION;
             float3 normalOS : NORMAL;
+            float4 tangentOS : TANGENT;
             float2 uv : TEXCOORD0;
         };
 
@@ -92,6 +99,8 @@ Shader "Meganeura/Stylized Foliage"
             half fogFactor : TEXCOORD4;
             float3 radialNormalWS : TEXCOORD5;
             float3 positionOS : TEXCOORD6;
+            half4 tangentWSAndSign : TEXCOORD7;
+            float2 normalUV : TEXCOORD8;
         };
 
         half SampleLeafAlpha(float2 uv)
@@ -149,6 +158,44 @@ Shader "Meganeura/Stylized Foliage"
                 + noiseVector * (_NormalNoiseStrength * 1.10h));
         }
 
+        float3 BuildStableTangent(float3 baseNormalWS, float3 tangentWS)
+        {
+            float3 projectedTangent = tangentWS
+                - baseNormalWS * dot(tangentWS, baseNormalWS);
+            if (dot(projectedTangent, projectedTangent) > 1e-8)
+                return normalize(projectedTangent);
+
+            // Imported tangents can become parallel to a strongly radial normal.
+            // Build a deterministic fallback axis instead of allowing a zero basis.
+            float3 fallbackAxis = abs(baseNormalWS.y) < 0.999
+                ? float3(0.0, 1.0, 0.0)
+                : float3(1.0, 0.0, 0.0);
+            return SafeNormalize(cross(fallbackAxis, baseNormalWS));
+        }
+
+        float3 ApplyLeafNormalDetail(float3 baseNormalWS, float3 tangentWS,
+            half tangentSign, float2 normalUV)
+        {
+            baseNormalWS = SafeNormalize(baseNormalWS);
+            float3 tangent = BuildStableTangent(baseNormalWS, tangentWS);
+            float3 bitangent = SafeNormalize(cross(baseNormalWS, tangent)) * tangentSign;
+
+            // Reconstructing Z after scaling XY gives a valid unit tangent-space
+            // normal. At strength zero it is exactly (0,0,1), so the Spec 008
+            // canopy normal passes through unchanged.
+            half3 detailTS = UnpackNormal(SAMPLE_TEXTURE2D(
+                _NormalMap, sampler_NormalMap, normalUV));
+            detailTS.xy *= _NormalStrength;
+            detailTS.z = sqrt(saturate(1.0h - dot(detailTS.xy, detailTS.xy)));
+
+            // Rotate the tangent-space detail into an orthonormal frame whose Z
+            // axis is the stylized canopy normal. This adds a surface gradient
+            // without replacing or naively adding to the large-scale normal.
+            return SafeNormalize(tangent * detailTS.x
+                + bitangent * detailTS.y
+                + baseNormalWS * detailTS.z);
+        }
+
         half3 SampleArtisticColorRamp(half lightingMask)
         {
             // Compress the deepest directional region so the canopy is led by
@@ -185,7 +232,8 @@ Shader "Meganeura/Stylized Foliage"
             {
                 Varyings output;
                 VertexPositionInputs positionInputs = GetVertexPositionInputs(input.positionOS.xyz);
-                VertexNormalInputs normalInputs = GetVertexNormalInputs(input.normalOS);
+                VertexNormalInputs normalInputs = GetVertexNormalInputs(
+                    input.normalOS, input.tangentOS);
                 output.positionCS = positionInputs.positionCS;
                 output.positionWS = positionInputs.positionWS;
                 output.normalWS = normalInputs.normalWS;
@@ -196,8 +244,11 @@ Shader "Meganeura/Stylized Foliage"
                 radialOS = ApplyNormalNoise(radialOS, input.positionOS.xyz);
                 output.radialNormalWS = TransformObjectToWorldNormal(radialOS);
                 output.positionOS = input.positionOS.xyz;
+                output.tangentWSAndSign = half4(normalInputs.tangentWS,
+                    input.tangentOS.w * GetOddNegativeScale());
                 output.baseUV = TRANSFORM_TEX(input.uv, _BaseMap);
                 output.alphaUV = TRANSFORM_TEX(input.uv, _AlphaMap);
+                output.normalUV = TRANSFORM_TEX(input.uv, _NormalMap);
                 output.fogFactor = ComputeFogFactor(positionInputs.positionCS.z);
                 return output;
             }
@@ -214,6 +265,9 @@ Shader "Meganeura/Stylized Foliage"
                 float3 blendedWS = lerp(normalWS, radialWS, _StylizedNormalStrength);
                 // Opposing normals can cancel at the midpoint; keep a finite direction.
                 normalWS = dot(blendedWS, blendedWS) > 1e-8 ? normalize(blendedWS) : radialWS;
+                normalWS = ApplyLeafNormalDetail(normalWS,
+                    input.tangentWSAndSign.xyz, input.tangentWSAndSign.w,
+                    input.normalUV);
 
                 float4 shadowCoord = TransformWorldToShadowCoord(input.positionWS);
                 Light mainLight = GetMainLight(shadowCoord);
@@ -403,6 +457,8 @@ Shader "Meganeura/Stylized Foliage"
                 float4 positionCS : SV_POSITION;
                 half3 normalWS : TEXCOORD0;
                 float2 alphaUV : TEXCOORD1;
+                float2 normalUV : TEXCOORD2;
+                half4 tangentWSAndSign : TEXCOORD3;
             };
 
             DepthNormalsVaryings DepthNormalsVert(Attributes input)
@@ -410,7 +466,9 @@ Shader "Meganeura/Stylized Foliage"
                 DepthNormalsVaryings output;
                 output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
 
-                half3 meshNormalWS = TransformObjectToWorldNormal(input.normalOS);
+                VertexNormalInputs normalInputs = GetVertexNormalInputs(
+                    input.normalOS, input.tangentOS);
+                half3 meshNormalWS = normalInputs.normalWS;
                 float3 radialOS = input.positionOS.xyz - _CanopyCenterOffset.xyz;
                 radialOS = dot(radialOS, radialOS) > 1e-20 ? radialOS : input.normalOS;
                 radialOS = ApplyNormalNoise(radialOS, input.positionOS.xyz);
@@ -419,12 +477,18 @@ Shader "Meganeura/Stylized Foliage"
                 output.normalWS = dot(blendedWS, blendedWS) > 1e-8
                     ? normalize(blendedWS) : normalize(radialWS);
                 output.alphaUV = TRANSFORM_TEX(input.uv, _AlphaMap);
+                output.normalUV = TRANSFORM_TEX(input.uv, _NormalMap);
+                output.tangentWSAndSign = half4(normalInputs.tangentWS,
+                    input.tangentOS.w * GetOddNegativeScale());
                 return output;
             }
 
             half4 DepthNormalsFrag(DepthNormalsVaryings input) : SV_Target
             {
                 clip(SampleLeafAlpha(input.alphaUV) - _AlphaClipThreshold);
+                input.normalWS = ApplyLeafNormalDetail(input.normalWS,
+                    input.tangentWSAndSign.xyz, input.tangentWSAndSign.w,
+                    input.normalUV);
 
                 #if defined(_GBUFFER_NORMALS_OCT)
                     float2 octNormalWS = PackNormalOctQuadEncode(normalize(input.normalWS));
