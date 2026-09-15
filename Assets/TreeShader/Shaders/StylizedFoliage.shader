@@ -8,6 +8,10 @@ Shader "Meganeura/Stylized Foliage"
         _AlphaClipThreshold ("Alpha Clip Threshold", Range(0,1)) = 0.5
         _StylizedNormalStrength ("Stylized Normal Strength", Range(0,1)) = 0
         _CanopyCenterOffset ("Canopy Center (Object Space)", Vector) = (0,0,0,0)
+        _ShadowThreshold ("Shadow Threshold", Range(0,1)) = 0.5
+        _ShadowSoftness ("Shadow Softness", Range(0,1)) = 0.5
+        _ShadowStrength ("Shadow Strength (Stops)", Range(0,4)) = 1.5
+        _LightDirectionBias ("Light Direction Bias (World Space)", Vector) = (0,0,0,0)
     }
 
     SubShader
@@ -37,6 +41,10 @@ Shader "Meganeura/Stylized Foliage"
             half _AlphaClipThreshold;
             float4 _CanopyCenterOffset;
             half _StylizedNormalStrength;
+            half _ShadowThreshold;
+            half _ShadowSoftness;
+            half _ShadowStrength;
+            float4 _LightDirectionBias;
         CBUFFER_END
 
         struct Attributes
@@ -112,10 +120,23 @@ Shader "Meganeura/Stylized Foliage"
 
                 float4 shadowCoord = TransformWorldToShadowCoord(input.positionWS);
                 Light mainLight = GetMainLight(shadowCoord);
-                half NdotL = saturate(dot(normalWS, mainLight.direction));
-                half3 ambient = SampleSH(normalWS);
-                half3 direct = mainLight.color * (NdotL * mainLight.distanceAttenuation * mainLight.shadowAttenuation);
-                half3 color = baseSample.rgb * (ambient + direct);
+                // Bias is world-space and bounded to a subtle angular offset.
+                float3 bias = _LightDirectionBias.xyz;
+                bias *= min(1.0, 0.25 / max(length(bias), 1e-5));
+                float3 lightDirection = SafeNormalize(mainLight.direction + bias);
+                half lambertMask = dot(normalWS, lightDirection) * 0.5h + 0.5h;
+                half halfWidth = max(_ShadowSoftness * 0.5h, 0.0001h);
+                half lightingMask = smoothstep(_ShadowThreshold - halfWidth,
+                    _ShadowThreshold + halfWidth, lambertMask);
+                // Realtime occlusion changes the mask, never multiplies final RGB.
+                lightingMask *= mainLight.shadowAttenuation;
+                half3 ambient = max(SampleSH(normalWS), 0.0h);
+                // Spec 005 uses the existing base color for both endpoints.
+                // Strength is exposure stops: 0 keeps base color, 1 halves it, 4 retains 1/16.
+                // Even maximum strength has a colored endpoint; no separate palette system.
+                half3 shadedColor = baseSample.rgb * exp2(-_ShadowStrength);
+                half3 litColor = baseSample.rgb * mainLight.color * mainLight.distanceAttenuation;
+                half3 color = baseSample.rgb * ambient + lerp(shadedColor, litColor, lightingMask);
                 color = MixFog(color, input.fogFactor);
                 return half4(color, 1.0h);
             }
