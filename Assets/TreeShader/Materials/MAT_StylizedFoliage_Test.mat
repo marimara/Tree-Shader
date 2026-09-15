@@ -33,7 +33,12 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
+    - _AOStrength: 0.35
     - _AlphaClipThreshold: 0.5
+    - _HeightDarkening: 0.15
+    - _HeightGradientPosition: -0.05
+    - _InteriorRadius: 0.026
+    - _InteriorStrength: 0.75
     - _ShadowSoftness: 0.5
     - _ShadowStrength: 0.7
     - _ShadowThreshold: 0.5
@@ -42,6 +47,7 @@ Material:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _CanopyCenterOffset: {r: 0.014050544, g: -0.0021115066, b: -0.0038637575, a: 0}
     - _DeepShadowColor: {r: 0.055, g: 0.34, b: 0.19, a: 1}
+    - _InteriorColor: {r: 0.035, g: 0.24, b: 0.13, a: 1}
     - _LightColor: {r: 0.36, g: 0.68, b: 0.18, a: 1}
     - _LightDirectionBias: {r: 0, g: 0, b: 0, a: 0}
     - _MidColor: {r: 0.18, g: 0.55, b: 0.2, a: 1}

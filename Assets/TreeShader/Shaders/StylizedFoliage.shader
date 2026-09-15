@@ -16,6 +16,12 @@ Shader "Meganeura/Stylized Foliage"
         _MidColor ("Mid Color", Color) = (0.18,0.55,0.20,1)
         _ShadowColor ("Shadow Color", Color) = (0.08,0.42,0.20,1)
         _DeepShadowColor ("Deep Shadow Color", Color) = (0.055,0.34,0.19,1)
+        _InteriorColor ("Interior Color", Color) = (0.035,0.24,0.13,1)
+        _InteriorStrength ("Interior Strength", Range(0,1)) = 0.75
+        _InteriorRadius ("Interior Radius (Object Space)", Range(0.001,0.1)) = 0.026
+        _AOStrength ("AO Strength", Range(0,1)) = 0.35
+        _HeightDarkening ("Height Darkening", Range(0,1)) = 0.15
+        _HeightGradientPosition ("Height Gradient Position", Range(-1,1)) = -0.05
     }
 
     SubShader
@@ -53,6 +59,12 @@ Shader "Meganeura/Stylized Foliage"
             half4 _MidColor;
             half4 _ShadowColor;
             half4 _DeepShadowColor;
+            half4 _InteriorColor;
+            half _InteriorStrength;
+            half _InteriorRadius;
+            half _AOStrength;
+            half _HeightDarkening;
+            half _HeightGradientPosition;
         CBUFFER_END
 
         struct Attributes
@@ -71,6 +83,7 @@ Shader "Meganeura/Stylized Foliage"
             float2 alphaUV : TEXCOORD3;
             half fogFactor : TEXCOORD4;
             float3 radialNormalWS : TEXCOORD5;
+            float3 positionOS : TEXCOORD6;
         };
 
         half SampleLeafAlpha(float2 uv)
@@ -104,9 +117,11 @@ Shader "Meganeura/Stylized Foliage"
             #pragma fragment Frag
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             #pragma multi_compile_fragment _ _SHADOWS_SOFT
+            #pragma multi_compile_fragment _ _SCREEN_SPACE_OCCLUSION
             #pragma multi_compile_fog
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/AmbientOcclusion.hlsl"
 
             Varyings Vert(Attributes input)
             {
@@ -121,6 +136,7 @@ Shader "Meganeura/Stylized Foliage"
                 // Only the exact center is undefined; do not clamp small imported meshes.
                 radialOS = dot(radialOS, radialOS) > 1e-20 ? radialOS : input.normalOS;
                 output.radialNormalWS = TransformObjectToWorldNormal(radialOS);
+                output.positionOS = input.positionOS.xyz;
                 output.baseUV = TRANSFORM_TEX(input.uv, _BaseMap);
                 output.alphaUV = TRANSFORM_TEX(input.uv, _AlphaMap);
                 output.fogFactor = ComputeFogFactor(positionInputs.positionCS.z);
@@ -161,6 +177,38 @@ Shader "Meganeura/Stylized Foliage"
                 half detailModulation = lerp(0.85h, 1.15h, saturate(baseLuminance));
                 half3 paletteColor = SampleArtisticColorRamp(lightingMask) * _BaseColor.rgb;
                 half3 detailedColor = paletteColor * detailModulation;
+
+                // Approximate canopy density from a soft object-local ellipsoid. The
+                // broad transition leaves the outer shell untouched and avoids a hard
+                // dark disk at the exact center of the mesh.
+                float3 canopyLocal = input.positionOS - _CanopyCenterOffset.xyz;
+                float3 densityShape = canopyLocal * float3(1.00, 1.20, 1.10);
+                half normalizedRadius = length(densityShape) / max(_InteriorRadius, 0.0001h);
+                half radialInterior = 1.0h - smoothstep(0.38h, 1.0h, normalizedRadius);
+
+                // This source asset is Z-up before its scene transform. Keeping the
+                // gradient object-local makes the control stable under scene rotation.
+                half normalizedHeight = canopyLocal.z / max(_InteriorRadius, 0.0001h);
+                half heightMask = 1.0h - smoothstep(_HeightGradientPosition - 0.25h,
+                    _HeightGradientPosition + 0.25h, normalizedHeight);
+                // Restrict height darkening toward the canopy body so the lower
+                // silhouette does not become a uniformly dark ring.
+                half heightInterior = heightMask * (1.0h - smoothstep(0.65h, 1.15h,
+                    normalizedRadius));
+
+                AmbientOcclusionFactor aoFactor = GetScreenSpaceAmbientOcclusion(
+                    GetNormalizedScreenSpaceUV(input.positionCS));
+                half aoOcclusion = 1.0h - min(aoFactor.directAmbientOcclusion,
+                    aoFactor.indirectAmbientOcclusion);
+                // AO adds a restrained color cue and is weighted toward already dense
+                // foliage instead of multiplying final RGB toward black.
+                half aoInterior = aoOcclusion * _AOStrength *
+                    lerp(0.15h, 0.45h, radialInterior);
+                half interiorAmount = saturate(radialInterior * _InteriorStrength
+                    + heightInterior * _HeightDarkening + aoInterior);
+                detailedColor = lerp(detailedColor,
+                    _InteriorColor.rgb * _BaseColor.rgb * detailModulation,
+                    interiorAmount);
 
                 // Preserve the Spec 005 stop-based shadow control without black multiplication.
                 // Ambient remains palette-tinted and deliberately subordinate to avoid washout.
