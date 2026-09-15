@@ -1,4 +1,4 @@
-# \# SPEC-005 — Painterly Flow Pattern
+# \# SPEC-005 — Flow Pattern Source Exploration
 
 # 
 
@@ -6,11 +6,15 @@
 
 # 
 
-# Replace the temporary flow visualization with a stylized painterly surface pattern inspired by the project's primary visual reference.
+# Determine the most suitable base pattern source for the Stylized Water Shader.
 
 # 
 
-# This is the first Spec where the water should begin to resemble the intended final visual language.
+# The project references suggest that the final water appearance should be created primarily through shader shaping rather than by using a fully authored final-looking water texture.
+
+# 
+
+# This Spec must compare several pattern-source strategies before committing the shader architecture to one solution.
 
 # 
 
@@ -22,7 +26,21 @@
 
 # 
 
-# Requires SPEC-001 through SPEC-004.
+# Requires completed and validated SPEC-004.
+
+# 
+
+# Preserve:
+
+# 
+
+# \- uniform flow direction;
+
+# \- flow speed;
+
+# \- depth coloring;
+
+# \- opacity.
 
 # 
 
@@ -30,41 +48,37 @@
 
 # 
 
-# \# Visual Target
+# \# Goal
 
 # 
 
-# Use the project's references in:
+# Compare at least three approaches:
 
 # 
 
-# Assets/WaterShader/References/
+# 1\. procedural noise;
+
+# 2\. sampled grayscale noise texture;
+
+# 3\. hybrid texture + procedural shaping.
 
 # 
 
-# Primary moving-water characteristics:
+# The purpose is to identify which approach provides the best foundation for:
 
 # 
 
-# \- elongated directional streaks;
+# \- calm water;
 
-# \- irregular brush-like shapes;
+# \- rivers;
 
-# \- multiple sizes of marks;
+# \- waterfalls;
 
-# \- graphic cyan / light-cyan highlights;
+# \- directional stretching;
 
-# \- readable movement;
+# \- thresholding;
 
-# \- limited fine noise.
-
-# 
-
-# Do not reproduce the reference shader exactly.
-
-# 
-
-# Use it as visual inspiration only.
+# \- future Flow Strength control.
 
 # 
 
@@ -72,33 +86,27 @@
 
 # 
 
-# \# Pattern Source
+# \# Pattern Modes
 
 # 
 
-# The system may use:
+# Introduce a temporary technical way to switch between pattern-source implementations.
 
 # 
 
-# \- one authored grayscale texture;
-
-# \- multiple authored textures;
-
-# \- procedural pattern generation;
-
-# \- procedural distortion combined with a texture.
+# This may be:
 
 # 
 
-# Choose the simplest solution that produces a convincing stylized result.
+# \_PatternSourceMode
 
 # 
 
-# Any new texture belongs in:
+# or an equivalent debug/development mechanism.
 
 # 
 
-# Assets/WaterShader/Textures/
+# It does not need to become a permanent production-facing material property.
 
 # 
 
@@ -106,53 +114,33 @@
 
 # 
 
-# \# Shader Properties
+# \# Candidate A — Procedural Noise
 
 # 
 
-# Expose useful controls such as:
+# Implement a simple procedural noise source.
 
 # 
 
-# \_PatternScale
-
-# \_PatternSpeed
-
-# \_PatternStrength
-
-# \_PatternColor
-
-# \_PatternStretch
+# Preferred characteristics:
 
 # 
 
-# Exact names may vary if the implementation is cleaner.
+# \- medium-to-large shapes;
+
+# \- no excessive high-frequency grain;
+
+# \- stable animation;
+
+# \- suitable for directional stretching.
 
 # 
 
-# Avoid exposing redundant controls.
+# Do not create an unnecessarily expensive multi-octave procedural system.
 
 # 
 
-# \---
-
-# 
-
-# \# Pattern Movement
-
-# 
-
-# The painterly pattern must follow the Flow Direction created in SPEC-004.
-
-# 
-
-# Changing Flow Direction must change both:
-
-# 
-
-# \- movement direction;
-
-# \- visual orientation where appropriate.
+# The goal is comparison, not maximum complexity.
 
 # 
 
@@ -160,31 +148,39 @@
 
 # 
 
-# \# Pattern Stretch
+# \# Candidate B — Noise Texture
 
 # 
 
-# Introduce directional stretching.
+# Support one grayscale seamless noise texture.
 
 # 
 
-# Low Stretch:
-
-# broader / more organic shapes.
+# Suggested asset:
 
 # 
 
-# High Stretch:
-
-# long directional streaks.
+# T\_WaterNoise\_01
 
 # 
 
-# This system will later be driven by Flow Strength.
+# Expected characteristics:
 
 # 
 
-# For this Spec, manual control is acceptable.
+# \- grayscale;
+
+# \- seamless;
+
+# \- medium-frequency abstract forms;
+
+# \- no baked lighting;
+
+# \- no perspective;
+
+# \- no obvious final water streaks;
+
+# \- suitable for transformation in the shader.
 
 # 
 
@@ -192,27 +188,205 @@
 
 # 
 
-# \# Layering
+# \# Candidate C — Hybrid
 
 # 
 
-# If needed, use two pattern samples with different:
+# Combine the sampled noise texture with simple procedural modification.
 
 # 
 
-# \- scales;
-
-# \- offsets;
-
-# \- speeds.
+# Possible techniques include:
 
 # 
 
-# Avoid excessive texture sampling.
+# \- procedural UV distortion;
+
+# \- remapping;
+
+# \- thresholding;
+
+# \- contrast shaping;
+
+# \- small secondary noise influence.
 
 # 
 
-# The pattern should remain readable rather than noisy.
+# Keep this version reasonably simple.
+
+# 
+
+# \---
+
+# 
+
+# \# Flow Integration
+
+# 
+
+# All three pattern-source candidates must use the directional flow system from SPEC-004.
+
+# 
+
+# Changing:
+
+# 
+
+# Flow Direction
+
+# 
+
+# or:
+
+# 
+
+# Flow Speed
+
+# 
+
+# must affect all candidates consistently.
+
+# 
+
+# \---
+
+# 
+
+# \# Comparison Controls
+
+# 
+
+# Expose only the controls needed for fair comparison.
+
+# 
+
+# Useful controls may include:
+
+# 
+
+# \_NoiseScale
+
+# \_NoiseContrast
+
+# \_NoiseStretch
+
+# 
+
+# Exact property names may differ.
+
+# 
+
+# Avoid prematurely exposing the full final shader interface.
+
+# 
+
+# \---
+
+# 
+
+# \# Visual Evaluation
+
+# 
+
+# Evaluate each candidate for:
+
+# 
+
+# \## Calm Water
+
+# 
+
+# Does it remain visually useful at low speed?
+
+# 
+
+# Does it avoid looking like frozen river noise?
+
+# 
+
+# \## River
+
+# 
+
+# Does it produce readable directional movement?
+
+# 
+
+# Can it form larger stylized shapes?
+
+# 
+
+# \## Waterfall
+
+# 
+
+# Can it be stretched strongly without becoming visually broken or overly repetitive?
+
+# 
+
+# \---
+
+# 
+
+# \# Performance Evaluation
+
+# 
+
+# Record approximate relative complexity.
+
+# 
+
+# Consider:
+
+# 
+
+# \- texture samples;
+
+# \- procedural calculations;
+
+# \- repeated noise evaluations;
+
+# \- shader readability.
+
+# 
+
+# Do not optimize aggressively yet.
+
+# 
+
+# The goal is to avoid selecting a pattern source that is unnecessarily expensive.
+
+# 
+
+# \---
+
+# 
+
+# \# Test Setup
+
+# 
+
+# Use the existing technical scene.
+
+# 
+
+# If useful, create three adjacent comparison surfaces:
+
+# 
+
+# Pattern\_Procedural
+
+# Pattern\_Texture
+
+# Pattern\_Hybrid
+
+# 
+
+# They should use comparable scale and flow settings.
+
+# 
+
+# Do not create a decorative environment.
 
 # 
 
@@ -224,39 +398,63 @@
 
 # 
 
-# Test at least three material configurations:
+# Capture comparison images or video showing:
 
 # 
 
-# Calm-like:
+# \- procedural;
 
-# low speed
+# \- texture;
 
-# low stretch
-
-# 
-
-# River-like:
-
-# medium speed
-
-# medium stretch
+# \- hybrid.
 
 # 
 
-# Waterfall-like:
-
-# high speed
-
-# high stretch
+# Evaluate all three at:
 
 # 
 
-# These are only visual tests.
+# \- low flow speed;
+
+# \- medium flow speed;
+
+# \- high flow speed.
 
 # 
 
-# Do not yet automate the transition between them.
+# At the end of the Spec, clearly document which source is selected as the basis for SPEC-006 and why.
+
+# 
+
+# Do not silently select one without reporting the comparison.
+
+# 
+
+# \---
+
+# 
+
+# \# External Assets
+
+# 
+
+# SPEC-005 may use one authored grayscale noise texture:
+
+# 
+
+# Assets/WaterShader/Textures/Flow/T\_WaterNoise\_01.png
+
+# 
+
+# Do not add additional textures unless comparison demonstrates that they are necessary.
+
+# 
+
+# The texture must not already contain the final painterly streak appearance.
+
+# 
+
+# It should serve as raw pattern data.
 
 # 
 
@@ -268,7 +466,23 @@
 
 # 
 
-# The shader clearly produces stylized flowing brush-like patterns that follow Flow Direction and respond to Flow Speed and Pattern Stretch.
+# SPEC-005 is complete when:
+
+# 
+
+# \- procedural noise is tested;
+
+# \- texture noise is tested;
+
+# \- a hybrid approach is tested;
+
+# \- all three respond to flow direction and speed;
+
+# \- a preferred source is selected and documented;
+
+# \- the chosen approach is suitable for calm water, rivers, and strong directional flow;
+
+# \- existing depth coloring remains functional.
 
 # 
 
@@ -284,15 +498,21 @@
 
 # 
 
-# \- Flow Maps;
+# \- final painterly styling;
 
-# \- automatic Flow Strength transition;
+# \- Flow Strength;
+
+# \- Flow Maps;
 
 # \- foam;
 
-# \- waterfall particles;
+# \- waves;
+
+# \- normals;
+
+# \- reflections;
 
 # \- refraction;
 
-# \- interaction.
+# \- waterfall VFX.
 

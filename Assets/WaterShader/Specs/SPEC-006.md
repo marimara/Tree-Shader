@@ -1,4 +1,4 @@
-# \# SPEC-006 — Flow Strength and Flow-to-Calm Transition
+# \# SPEC-006 — Stylized Flow Pattern Shaping
 
 # 
 
@@ -6,25 +6,15 @@
 
 # 
 
-# Introduce Flow Strength as a central shader parameter.
+# Transform the pattern source selected in SPEC-005 into the project's stylized directional water pattern.
 
 # 
 
-# The same shader must visually transition between:
+# This is the first Spec focused on the actual visual language of moving water.
 
 # 
 
-# \- calm water;
-
-# \- slow flowing water;
-
-# \- river water;
-
-# \- strongly directional flowing water.
-
-# 
-
-# This is the first major proof-of-concept for the complete Stylized Water system.
+# The shader should begin to resemble the visual references without implementing foam or waterfall-specific effects.
 
 # 
 
@@ -36,7 +26,19 @@
 
 # 
 
-# Requires SPEC-001 through SPEC-005.
+# Requires completed and validated SPEC-005.
+
+# 
+
+# Read the SPEC-005 completion report before implementation.
+
+# 
+
+# Use the pattern-source approach selected during SPEC-005.
+
+# 
+
+# Do not restart the pattern-source architecture unless validation showed a technical problem.
 
 # 
 
@@ -44,73 +46,55 @@
 
 # 
 
-# \# Core Property
+# \# Visual Target
 
 # 
 
-# Add:
+# Use the visual references stored in:
 
 # 
 
-# \_FlowStrength
+# Assets/WaterShader/References/
 
 # 
 
-# Range:
+# Target characteristics:
 
 # 
 
-# 0 to 1
+# \- clear directional movement;
+
+# \- elongated highlight-like shapes;
+
+# \- large readable forms;
+
+# \- limited fine noise;
+
+# \- irregular but controlled shapes;
+
+# \- graphic stylized appearance;
+
+# \- clean negative space;
+
+# \- suitable for both river and waterfall stretching.
 
 # 
 
-# Meaning:
+# Avoid:
 
 # 
 
-# 0 = calm / nearly still water
+# \- realistic ocean detail;
 
-# 
+# \- tiny noisy grain;
 
-# 1 = maximum directional flow
+# \- marble appearance;
 
-# 
+# \- cloud-like patterns;
 
-# \---
+# \- uniform sine-wave bands;
 
-# 
-
-# \# Flow Strength Must Affect More Than Speed
-
-# 
-
-# Flow Strength must not simply multiply Flow Speed.
-
-# 
-
-# It should influence multiple visual characteristics.
-
-# 
-
-# At minimum:
-
-# 
-
-# 1\. effective flow speed;
-
-# 2\. painterly pattern stretch;
-
-# 3\. painterly pattern visibility / strength.
-
-# 
-
-# Optional if useful:
-
-# 
-
-# 4\. pattern distortion;
-
-# 5\. secondary pattern contribution.
+# \- overly dense surface detail.
 
 # 
 
@@ -118,61 +102,39 @@
 
 # 
 
-# \# Target Behavior
+# \# Pattern Shaping
 
 # 
 
-# \## Flow Strength = 0
+# Create controls that transform the base noise into stylized water marks.
 
 # 
 
-# Water should appear calm.
+# Expected techniques may include:
 
 # 
 
-# Expected characteristics:
+# \- contrast adjustment;
+
+# \- remapping;
+
+# \- Smoothstep;
+
+# \- thresholding;
+
+# \- directional scaling;
+
+# \- UV stretching;
+
+# \- selective masking.
 
 # 
 
-# \- very slow or nearly static movement;
-
-# \- broad pattern shapes;
-
-# \- minimal directional streaking;
-
-# \- no visual impression of rushing water.
+# Do not assume all techniques are required.
 
 # 
 
-# The water should not look completely frozen.
-
-# 
-
-# A very subtle baseline movement is acceptable.
-
-# 
-
-# \---
-
-# 
-
-# \## Flow Strength \~ 0.3
-
-# 
-
-# Water should resemble slow-moving water.
-
-# 
-
-# Expected characteristics:
-
-# 
-
-# \- visible but gentle motion;
-
-# \- some directional behavior;
-
-# \- broader pattern shapes.
+# Use the simplest combination that achieves the target.
 
 # 
 
@@ -180,51 +142,39 @@
 
 # 
 
-# \## Flow Strength \~ 0.6
+# \# Required Controls
 
 # 
 
-# Water should resemble a river.
+# Expose useful controls for:
 
 # 
 
-# Expected characteristics:
+# \_PatternScale
+
+# \_PatternStrength
+
+# \_PatternStretch
+
+# \_PatternColor
 
 # 
 
-# \- clear directional motion;
-
-# \- more elongated patterns;
-
-# \- stronger visual flow.
+# Also expose threshold / softness controls if required by the selected shaping technique.
 
 # 
 
-# \---
+# Example:
 
 # 
 
-# \## Flow Strength = 1
+# \_PatternThreshold
+
+# \_PatternSoftness
 
 # 
 
-# Water should resemble fast-moving water suitable as a basis for rapids or waterfall surfaces.
-
-# 
-
-# Expected characteristics:
-
-# 
-
-# \- strong movement;
-
-# \- high directional stretching;
-
-# \- clearly readable streaks.
-
-# 
-
-# Do not implement waterfall foam or particles yet.
+# Avoid redundant controls.
 
 # 
 
@@ -232,51 +182,39 @@
 
 # 
 
-# \# Transition Test Surface
+# \# Directional Stretch
 
 # 
 
-# Create a dedicated test object demonstrating the concept.
+# Pattern Stretch must act relative to flow direction.
 
 # 
 
-# Suggested name:
+# Low values:
 
 # 
 
-# FlowTransition\_Test
+# \- broader;
+
+# \- softer;
+
+# \- less directional.
 
 # 
 
-# The ideal test should show:
+# High values:
 
 # 
 
-# Fast Flow -> Medium Flow -> Slow Flow -> Calm
+# \- elongated;
+
+# \- clearly directional;
+
+# \- suitable for rapid water / waterfall-like streaks.
 
 # 
 
-# within one visual setup.
-
-# 
-
-# For this Spec, this may be accomplished with:
-
-# 
-
-# \- multiple adjacent meshes using materials with different Flow Strength values;
-
-# 
-
-# or
-
-# 
-
-# \- another simple controlled setup.
-
-# 
-
-# A true spatial mask / Flow Map is not required yet.
+# Changing Flow Direction should also rotate/reorient the effective pattern behavior appropriately.
 
 # 
 
@@ -284,29 +222,19 @@
 
 # 
 
-# \# Test Materials
+# \# Pattern Color
 
 # 
 
-# Creating temporary comparison materials is allowed.
+# The pattern should act as a stylized highlight/detail layer over the existing depth-based water color.
 
 # 
 
-# Examples:
+# Use a light cyan / near-white default.
 
 # 
 
-# MAT\_Water\_Flow\_00
-
-# MAT\_Water\_Flow\_33
-
-# MAT\_Water\_Flow\_66
-
-# MAT\_Water\_Flow\_100
-
-# 
-
-# If these are only temporary validation materials, keep the number reasonable.
+# Do not replace the shallow/deep color system.
 
 # 
 
@@ -314,23 +242,33 @@
 
 # 
 
-# \# Important Visual Requirement
+# \# Layering
 
 # 
 
-# The calm version must not look like:
+# If the chosen pattern source benefits from multiple samples, a second sample is allowed.
 
 # 
 
-# "the river texture paused."
+# Possible differences:
 
 # 
 
-# Instead, decreasing Flow Strength must visibly change the character of the pattern.
+# \- scale;
+
+# \- speed;
+
+# \- offset;
+
+# \- threshold.
 
 # 
 
-# This is a critical acceptance requirement.
+# Do not use multiple samples by default unless they materially improve the visual result.
+
+# 
+
+# Keep the pattern readable.
 
 # 
 
@@ -338,11 +276,55 @@
 
 # 
 
-# \# Debug
+# \# Calm / River / Waterfall Test Presets
 
 # 
 
-# A Flow Strength debug display may be added if useful.
+# Validate manually using at least three temporary configurations.
+
+# 
+
+# \## Calm-like
+
+# 
+
+# \- low speed;
+
+# \- low stretch;
+
+# \- low pattern strength.
+
+# 
+
+# \## River-like
+
+# 
+
+# \- medium speed;
+
+# \- medium stretch;
+
+# \- medium pattern strength.
+
+# 
+
+# \## Waterfall-like
+
+# 
+
+# \- high speed;
+
+# \- high stretch;
+
+# \- stronger pattern visibility.
+
+# 
+
+# These are manual test states only.
+
+# 
+
+# Automatic transition belongs to SPEC-007.
 
 # 
 
@@ -354,39 +336,49 @@
 
 # 
 
-# Capture a comparison showing multiple Flow Strength states.
+# Confirm:
 
 # 
 
-# Recommended values:
+# \- patterns follow flow direction;
+
+# \- patterns stretch in the flow direction;
+
+# \- pattern scale remains controllable;
+
+# \- threshold / shaping produces clean forms;
+
+# \- the result remains readable at a distance;
+
+# \- the river configuration begins resembling the intended visual references;
+
+# \- strong stretch produces useful waterfall-like streaks;
+
+# \- low stretch does not look obviously broken.
 
 # 
 
-# 0.0
-
-# 0.33
-
-# 0.66
-
-# 1.0
+# Capture comparison validation.
 
 # 
 
-# Verify:
+# \---
 
 # 
 
-# \- animation progressively accelerates;
+# \# External Assets
 
-# \- patterns progressively stretch;
+# 
 
-# \- calm water remains alive but subtle;
+# Use only assets selected during SPEC-005.
 
-# \- fast water feels directional;
+# 
 
-# \- depth coloring remains functional;
+# Do not add another pattern/noise texture unless the existing source demonstrably cannot produce the required result.
 
-# \- no existing feature regresses.
+# 
+
+# If another external texture appears necessary, stop and report the need before creating/importing it.
 
 # 
 
@@ -398,11 +390,21 @@
 
 # 
 
-# The shader convincingly demonstrates a continuous visual family from calm water to fast flowing water.
+# SPEC-006 is complete when:
 
 # 
 
-# This Spec is successful when a viewer can understand the difference in water velocity without needing UI labels.
+# \- the raw noise source has been transformed into deliberate stylized water marks;
+
+# \- direction and stretch behave correctly;
+
+# \- calm-like, river-like, and waterfall-like manual presets are visually distinct;
+
+# \- the pattern remains part of the same visual family across these states;
+
+# \- depth-based coloring remains functional;
+
+# \- no foam or other future effects were added.
 
 # 
 
@@ -414,13 +416,13 @@
 
 # 
 
-# Do not implement yet:
+# Do not implement:
 
 # 
 
-# \- Flow Maps;
+# \- automatic Flow Strength transition;
 
-# \- curves in river direction;
+# \- Flow Maps;
 
 # \- foam;
 
@@ -430,11 +432,11 @@
 
 # \- normals;
 
-# \- reflection;
-
 # \- refraction;
 
-# \- waterfall impact VFX;
+# \- reflection;
+
+# \- waterfall particles;
 
 # \- interaction.
 

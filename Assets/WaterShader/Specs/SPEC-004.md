@@ -6,15 +6,19 @@
 
 # 
 
-# Introduce the first animated flow system.
+# Introduce the first animated water-flow system.
 
 # 
 
-# This Spec establishes directional motion without Flow Maps.
+# This Spec establishes a stable directional UV animation system that later Specs can reuse for stylized patterns and Flow Maps.
 
 # 
 
 # The entire test surface may use one uniform flow direction.
+
+# 
+
+# This Spec is technical infrastructure, not final visual styling.
 
 # 
 
@@ -26,7 +30,29 @@
 
 # 
 
-# Requires SPEC-001 through SPEC-003.
+# Requires completed and validated:
+
+# 
+
+# \- SPEC-001
+
+# \- SPEC-002
+
+# \- SPEC-003
+
+# 
+
+# Preserve:
+
+# 
+
+# \- depth-based coloring;
+
+# \- shallow/deep colors;
+
+# \- opacity;
+
+# \- existing WaterShader\_TestScene.
 
 # 
 
@@ -34,7 +60,7 @@
 
 # 
 
-# \# Shader Properties
+# \# Required Shader Properties
 
 # 
 
@@ -48,7 +74,7 @@
 
 # 
 
-# Suggested Inspector names:
+# Inspector names:
 
 # 
 
@@ -58,11 +84,15 @@
 
 # 
 
-# Flow Direction should operate as a 2D direction.
+# Flow Direction should represent a 2D direction.
 
 # 
 
 # Normalize internally where appropriate.
+
+# 
+
+# Flow Speed should control animation velocity independently from direction.
 
 # 
 
@@ -78,15 +108,31 @@
 
 # 
 
-# The system should allow texture coordinates to move along:
+# Conceptually:
 
 # 
 
-# Flow Direction \* Flow Speed \* Time
+# flowOffset =
+
+# &#x20;   normalizedFlowDirection
+
+# &#x20;   \* FlowSpeed
+
+# &#x20;   \* Time
 
 # 
 
-# Do not yet create complex Flow Map logic.
+# animatedUV =
+
+# &#x20;   baseUV + flowOffset
+
+# 
+
+# The implementation should be structured so future Specs can replace the uniform direction with data from a Flow Map.
+
+# 
+
+# Avoid tightly coupling flow calculations to temporary visualization logic.
 
 # 
 
@@ -98,25 +144,23 @@
 
 # 
 
-# Because no final painterly texture exists yet, create a procedural or very simple temporary flow visualization.
+# Create a simple procedural visualization to make direction and speed obvious.
 
 # 
 
-# Acceptable options include:
+# Preferred solution:
 
 # 
 
-# \- procedural stripes;
-
-# \- simple noise;
-
-# \- generated gradient;
-
-# \- minimal temporary texture.
+# procedural stripes or bands.
 
 # 
 
-# The purpose is only to verify:
+# Do not use an authored texture for this Spec.
+
+# 
+
+# The visualization exists only to validate:
 
 # 
 
@@ -124,11 +168,13 @@
 
 # \- speed;
 
-# \- UV stability.
+# \- UV movement;
+
+# \- stability.
 
 # 
 
-# Do not spend time polishing the visual pattern yet.
+# Do not polish it into the final water pattern.
 
 # 
 
@@ -136,11 +182,11 @@
 
 # 
 
-# \# Recommended Architecture
+# \# Architecture
 
 # 
 
-# If flow logic becomes substantial enough, create:
+# If the flow logic becomes large enough to justify separation, create:
 
 # 
 
@@ -148,11 +194,11 @@
 
 # 
 
-# Otherwise it may remain inside StylizedWater.shader for this Spec.
+# Do not create an include merely for a few trivial expressions.
 
 # 
 
-# Do not create an include simply for a few trivial lines.
+# If created, WaterFlow.hlsl should contain reusable flow-related calculations rather than visual styling.
 
 # 
 
@@ -164,7 +210,7 @@
 
 # 
 
-# Create or duplicate a test surface specifically suitable for flow inspection.
+# Add or configure a technical surface suitable for flow inspection.
 
 # 
 
@@ -176,11 +222,43 @@
 
 # 
 
-# It may simply be a long rectangular plane.
+# A long rectangular plane is sufficient.
 
 # 
 
-# Keep Water\_Test available for depth comparison if useful.
+# Keep existing depth validation geometry available.
+
+# 
+
+# Do not build a decorative river environment.
+
+# 
+
+# \---
+
+# 
+
+# \# Debugging
+
+# 
+
+# A temporary flow-direction visualization is allowed if useful.
+
+# 
+
+# For example:
+
+# 
+
+# \- UV bands;
+
+# \- directional color;
+
+# \- animated procedural stripes.
+
+# 
+
+# Do not make debug visualization the default final shader appearance.
 
 # 
 
@@ -196,19 +274,71 @@
 
 # 
 
-# \- positive X flow;
+# Flow Direction:
 
-# \- negative X flow;
+# \- positive X;
 
-# \- positive Y flow;
+# \- negative X;
 
-# \- diagonal flow;
+# \- positive Y;
 
-# \- Flow Speed = 0 produces no movement;
+# \- negative Y;
 
-# \- high speed is clearly visible;
+# \- diagonal directions.
 
-# \- depth coloring still works.
+# 
+
+# Flow Speed:
+
+# \- 0 produces no movement;
+
+# \- low speed is visibly slow;
+
+# \- high speed is clearly faster.
+
+# 
+
+# Also confirm:
+
+# 
+
+# \- depth coloring still works;
+
+# \- opacity still works;
+
+# \- no visual jitter appears;
+
+# \- Unity reports no new shader errors.
+
+# 
+
+# \---
+
+# 
+
+# \# External Assets
+
+# 
+
+# SPEC-004 requires no external textures or meshes.
+
+# 
+
+# Do not create or import:
+
+# 
+
+# \- noise textures;
+
+# \- flow textures;
+
+# \- foam textures;
+
+# \- distortion textures;
+
+# \- masks;
+
+# \- normal maps.
 
 # 
 
@@ -220,11 +350,21 @@
 
 # 
 
-# The shader has a reliable configurable directional animation system.
+# SPEC-004 is complete when:
 
 # 
 
-# The implementation should be suitable as a foundation for the later painterly flow pattern.
+# \- configurable uniform flow direction works;
+
+# \- configurable flow speed works;
+
+# \- the flow system is reusable by future Specs;
+
+# \- direction can be changed without rewriting pattern logic;
+
+# \- depth coloring remains functional;
+
+# \- the shader compiles cleanly.
 
 # 
 
@@ -242,15 +382,21 @@
 
 # \- Flow Maps;
 
-# \- river bends;
+# \- painterly final patterns;
 
-# \- Flow Strength masks;
+# \- noise exploration;
 
-# \- painterly final streaks;
+# \- Flow Strength;
 
 # \- foam;
 
 # \- waves;
 
-# \- refraction.
+# \- normals;
+
+# \- refraction;
+
+# \- reflection;
+
+# \- waterfall VFX.
 
