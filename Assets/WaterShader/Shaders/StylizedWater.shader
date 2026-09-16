@@ -131,7 +131,7 @@ Shader "Meganeura/Water/Stylized Water"
 
                 if (_UseFlowMap > 0.5h)
                 {
-                    half4 flowSample = SAMPLE_TEXTURE2D(_FlowMap, sampler_FlowMap, baseUV);
+                    float4 flowSample = SAMPLE_TEXTURE2D(_FlowMap, sampler_FlowMap, baseUV);
                     float2 decodedDirection = flowSample.rg * 2.0 - 1.0;
                     float directionLengthSquared = dot(decodedDirection, decodedDirection);
                     flow.direction = directionLengthSquared > 0.0001
@@ -351,7 +351,15 @@ Shader "Meganeura/Water/Stylized Water"
 
                 half character = smoothstep(0.0h, 1.0h, flow.strength);
                 half speedFactor = _PatternSourceMode < 2.5h ? 1.0h : lerp(0.06h, 1.0h, character);
-                const float loopDistance = 0.24;
+                // The old 0.24 chart-unit cycle barely displaced an elongated
+                // mark before resetting (3.6 cycles/second at speed 0.87).
+                // Cover two source-pattern units at the maximum artist stretch.
+                // Keep the clock material-wide: local B must not desynchronize
+                // phase resets across the surface. The chart bounds deformation
+                // independently of this longer animation lifetime.
+                float referenceStretch = _PatternSourceMode < 2.5h ? _NoiseStretch : _PatternStretch;
+                float referenceScale = _PatternSourceMode < 2.5h ? _NoiseScale : _PatternScale;
+                float loopDistance = max(0.24, 2.0 * referenceStretch / max(referenceScale, 0.1));
                 float phaseA = frac(_Time.y * _FlowSpeed / loopDistance);
                 float phaseB = frac(phaseA + 0.5);
                 float2 travel = chartVector * (loopDistance * speedFactor);
@@ -360,7 +368,15 @@ Shader "Meganeura/Water/Stylized Water"
                 // reintroducing derivatives of a locally rotated coordinate frame.
                 half stretch, scale;
                 GetPatternMetrics(flow.strength, stretch, scale);
-                float2 patternScale = float2(scale / max(stretch, 0.0001h), scale);
+                // Multiplying transverse coordinates by a spatially varying B
+                // bends every constant-pattern contour even on a straight exit.
+                // Anchor transverse density to the material's reference strength;
+                // local B still drives longitudinal stretch/scale, speed and shaping.
+                // With constant B equal to _FlowStrength this exactly matches
+                // the SPEC-007 footprint. Uniform flow remains unchanged.
+                half referencePatternStretch, referencePatternScale;
+                GetPatternMetrics(_FlowStrength, referencePatternStretch, referencePatternScale);
+                float2 patternScale = float2(scale / max(stretch, 0.0001h), referencePatternScale);
                 half a = GetPatternSource((channelUV - phaseA * travel) * patternScale, flow.strength);
                 half b = GetPatternSource((channelUV - phaseB * travel) * patternScale, flow.strength);
                 half weight = sin(phaseA * 3.14159265);
