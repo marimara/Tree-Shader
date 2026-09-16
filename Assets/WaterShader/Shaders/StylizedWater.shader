@@ -12,6 +12,7 @@ Shader "Meganeura/Water/Stylized Water"
         _FlowStrength ("Flow Strength", Range(0.0, 1.0)) = 0.66
         [NoScaleOffset] _FlowMap ("Flow Map (RG Direction, B Strength)", 2D) = "gray" {}
         [Toggle] _UseFlowMap ("Use Flow Map", Float) = 0.0
+        [Toggle] _UseFlowCoordinates ("Use Channel Coordinates (UV2 + UV3 Frame)", Float) = 0.0
         _FlowMapMinStrength ("Flow Map Min Strength", Range(0.0, 1.0)) = 0.35
         _FlowMapMaxStrength ("Flow Map Max Strength", Range(0.0, 1.0)) = 0.82
         _FlowMapOrientationInfluence ("Flow Map Orientation Influence", Range(0.0, 1.0)) = 0.72
@@ -66,6 +67,7 @@ Shader "Meganeura/Water/Stylized Water"
                 half _FlowSpeed;
                 half _FlowStrength;
                 half _UseFlowMap;
+                half _UseFlowCoordinates;
                 half _FlowMapMinStrength;
                 half _FlowMapMaxStrength;
                 half _FlowMapOrientationInfluence;
@@ -93,6 +95,8 @@ Shader "Meganeura/Water/Stylized Water"
                 float4 positionOS : POSITION;
                 float3 normalOS : NORMAL;
                 float2 uv : TEXCOORD0;
+                float2 flowUV : TEXCOORD1;
+                float4 flowFrame : TEXCOORD2;
             };
 
             struct Varyings
@@ -101,6 +105,8 @@ Shader "Meganeura/Water/Stylized Water"
                 float3 positionWS : TEXCOORD0;
                 half3 normalWS : TEXCOORD1;
                 float2 uv : TEXCOORD2;
+                float2 flowUV : TEXCOORD3;
+                float4 flowFrame : TEXCOORD4;
             };
 
             float2 GetUniformFlowDirection(float2 flowDirection)
@@ -155,14 +161,20 @@ Shader "Meganeura/Water/Stylized Water"
                 float hasReference = step(0.000001, dot(referenceDirection, referenceDirection));
                 referenceDirection = lerp(localDirection, referenceDirection, hasReference);
 
-                // Direction drives motion at full strength. Pattern orientation is
-                // intentionally less reactive so a smooth bend does not twist the
-                // authored streak silhouette into an arc.
-                float2 blendedDirection = lerp(referenceDirection, localDirection, saturate(_FlowMapOrientationInfluence));
-                float blendedLengthSquared = dot(blendedDirection, blendedDirection);
-                return blendedLengthSquared > 0.000001
-                    ? blendedDirection * rsqrt(blendedLengthSquared)
-                    : float2(1.0, 0.0);
+                // Flow-map curvature is produced by integrated advection below,
+                // not by rotating absolute coordinates independently per fragment.
+                // A stable reference basis keeps the SPEC-006/007 mark silhouette
+                // clean while the backtrace supplies the spatial trajectory.
+                return _UseFlowMap > 0.5h ? referenceDirection : localDirection;
+            }
+
+            void GetPatternMetrics(half strength, out half effectiveStretch, out half effectiveScale)
+            {
+                half flowCharacter = smoothstep(0.0h, 1.0h, strength);
+                half shapedStretch = lerp(1.15h, _PatternStretch, flowCharacter);
+                half shapedScale = _PatternScale * lerp(0.58h, 1.0h, flowCharacter);
+                effectiveStretch = _PatternSourceMode < 2.5h ? _NoiseStretch : shapedStretch;
+                effectiveScale = _PatternSourceMode < 2.5h ? _NoiseScale : shapedScale;
             }
 
             float2 GetDirectionalPatternUV(float2 animatedUV, FlowData flow)
@@ -171,11 +183,8 @@ Shader "Meganeura/Water/Stylized Water"
                 float hasDirection = step(0.000001, dot(patternDirection, patternDirection));
                 patternDirection = lerp(float2(1.0, 0.0), patternDirection, hasDirection);
                 float2 patternPerpendicular = float2(-patternDirection.y, patternDirection.x);
-                half flowCharacter = smoothstep(0.0h, 1.0h, flow.strength);
-                half shapedStretch = lerp(1.15h, _PatternStretch, flowCharacter);
-                half shapedScale = _PatternScale * lerp(0.58h, 1.0h, flowCharacter);
-                half effectiveStretch = _PatternSourceMode < 2.5h ? _NoiseStretch : shapedStretch;
-                half effectiveScale = _PatternSourceMode < 2.5h ? _NoiseScale : shapedScale;
+                half effectiveStretch, effectiveScale;
+                GetPatternMetrics(flow.strength, effectiveStretch, effectiveScale);
                 // Rotate around the UV centre instead of the texture origin. This
                 // bounds the displacement introduced by a varying local basis and
                 // prevents large-scale bowing across the surface.
@@ -255,25 +264,65 @@ Shader "Meganeura/Water/Stylized Water"
                 return GetShapedHybridPattern(patternUV, flowStrength);
             }
 
+            float2 SampleFlowMapDirection(float2 uv)
+            {
+                half2 encodedDirection = SAMPLE_TEXTURE2D(_FlowMap, sampler_FlowMap, saturate(uv)).rg;
+                float2 decodedDirection = encodedDirection * 2.0 - 1.0;
+                float directionLengthSquared = dot(decodedDirection, decodedDirection);
+                return directionLengthSquared > 0.0001
+                    ? decodedDirection * rsqrt(directionLengthSquared)
+                    : float2(0.0, 0.0);
+            }
+
+            float2 TraceFlowMapBackward(float2 baseUV, float2 initialDirection, half distance)
+            {
+                // Compatibility path for meshes without a channel chart. Bounded
+                // tracing improves motion, but cannot establish global alignment
+                // of an anisotropic source pattern around arbitrary bends.
+                const half integrationSteps = 4.0h;
+                half stepDistance = distance / integrationSteps;
+                float2 tracedUV = baseUV;
+                float2 direction = initialDirection;
+
+                [unroll]
+                for (int stepIndex = 0; stepIndex < 4; stepIndex++)
+                {
+                    tracedUV -= direction * stepDistance;
+                    if (stepIndex < 3)
+                        direction = SampleFlowMapDirection(tracedUV);
+                }
+
+                return tracedUV;
+            }
+
             half GetDualPhaseFlowMapPattern(float2 baseUV, FlowData flow)
             {
-                // The centred, damped local basis supplies broad orientation only;
-                // local curvature is not allowed to become pattern deformation.
-                float2 patternUV = GetDirectionalPatternUV(baseUV, flow);
                 half flowCharacter = smoothstep(0.0h, 1.0h, flow.strength);
                 half hasDirection = step(0.000001h, dot(flow.direction, flow.direction));
 
-                // Use a shared repeating clock and scale travel distance locally.
-                // This preserves local perceived speed without accumulating spatial
-                // phase shear as differently strong regions run for a long time.
-                const half loopDistance = 0.45h;
+                // A shared bounded clock keeps differently strong regions from
+                // accumulating spatial phase shear over long runs.
+                const half loopDistance = 0.24h;
                 float cycleTime = _Time.y * _FlowSpeed / loopDistance;
                 float phaseA = frac(cycleTime);
                 float phaseB = frac(cycleTime + 0.5);
                 half travelDistance = loopDistance * lerp(0.06h, 1.0h, flowCharacter) * hasDirection;
 
-                float2 patternUVA = patternUV + float2(phaseA * travelDistance, 0.0);
-                float2 patternUVB = patternUV + float2(phaseB * travelDistance, 0.0);
+                // Orientation influence is now a small integrated pre-roll only.
+                // It cannot blend away the Flow Map direction and does not rotate
+                // coordinates locally; streamline integration remains authoritative.
+                half orientationPreRoll = loopDistance * 0.18h * saturate(_FlowMapOrientationInfluence) * hasDirection;
+                float2 sourceUVA = TraceFlowMapBackward(
+                    baseUV,
+                    flow.direction,
+                    orientationPreRoll + phaseA * travelDistance);
+                float2 sourceUVB = TraceFlowMapBackward(
+                    baseUV,
+                    flow.direction,
+                    orientationPreRoll + phaseB * travelDistance);
+
+                float2 patternUVA = GetDirectionalPatternUV(sourceUVA, flow);
+                float2 patternUVB = GetDirectionalPatternUV(sourceUVB, flow);
                 half patternA = GetPatternSource(patternUVA, flow.strength);
                 half patternB = GetPatternSource(patternUVB, flow.strength);
 
@@ -285,6 +334,40 @@ Shader "Meganeura/Water/Stylized Water"
                 return (patternA * weightA + patternB * weightB) / weightSum;
             }
 
+            // UV0 addresses the SPEC-008 vector field. UV2 is a continuous chart:
+            // X = distance along the channel, Y = distance across it. Geometry,
+            // rather than a rotating per-pixel basis, establishes the silhouette.
+            half GetChannelPattern(float2 channelUV, float4 frame, FlowData flow)
+            {
+                // UV3 holds d(UV0)/d(channel U,V). Interpolating a smooth authored
+                // frame avoids triangle-wise ddx/ddy velocity seams on curved strips.
+                float2 along = frame.xy, across = frame.zw;
+                float determinant = along.x * across.y - along.y * across.x;
+                float safeDet = abs(determinant) > 1e-12 ? determinant : 1.0;
+                float2 chartVector = float2(
+                    across.y * flow.direction.x - across.x * flow.direction.y,
+                    along.x * flow.direction.y - along.y * flow.direction.x) / safeDet;
+                chartVector = abs(determinant) > 1e-12 ? GetUniformFlowDirection(chartVector) : float2(0, 0);
+
+                half character = smoothstep(0.0h, 1.0h, flow.strength);
+                half speedFactor = _PatternSourceMode < 2.5h ? 1.0h : lerp(0.06h, 1.0h, character);
+                const float loopDistance = 0.24;
+                float phaseA = frac(_Time.y * _FlowSpeed / loopDistance);
+                float phaseB = frac(phaseA + 0.5);
+                float2 travel = chartVector * (loopDistance * speedFactor);
+
+                // Reuse SPEC-006/007 shaping unchanged. A fixed chart basis avoids
+                // reintroducing derivatives of a locally rotated coordinate frame.
+                half stretch, scale;
+                GetPatternMetrics(flow.strength, stretch, scale);
+                float2 patternScale = float2(scale / max(stretch, 0.0001h), scale);
+                half a = GetPatternSource((channelUV - phaseA * travel) * patternScale, flow.strength);
+                half b = GetPatternSource((channelUV - phaseB * travel) * patternScale, flow.strength);
+                half weight = sin(phaseA * 3.14159265);
+                weight *= weight;
+                return lerp(b, a, weight);
+            }
+
             Varyings Vert(Attributes input)
             {
                 Varyings output;
@@ -293,6 +376,8 @@ Shader "Meganeura/Water/Stylized Water"
                 output.positionWS = positionInputs.positionWS;
                 output.normalWS = TransformObjectToWorldNormal(input.normalOS);
                 output.uv = input.uv;
+                output.flowUV = input.flowUV;
+                output.flowFrame = input.flowFrame;
                 return output;
             }
 
@@ -320,7 +405,9 @@ Shader "Meganeura/Water/Stylized Water"
                 half pattern;
                 if (_UseFlowMap > 0.5h)
                 {
-                    pattern = GetDualPhaseFlowMapPattern(input.uv, flow);
+                    pattern = _UseFlowCoordinates > 0.5h
+                        ? GetChannelPattern(input.flowUV, input.flowFrame, flow)
+                        : GetDualPhaseFlowMapPattern(input.uv, flow);
                 }
                 else
                 {

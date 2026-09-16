@@ -39,7 +39,7 @@ Material:
     - _FlowMapMaxStrength: 0.82
     - _FlowMapMinStrength: 0.35
     - _FlowMapOrientationInfluence: 0.72
-    - _FlowSpeed: 1.5
+    - _FlowSpeed: 0.25
     - _FlowStrength: 0.72
     - _FlowVisualization: 1
     - _NoiseContrast: 1.55
@@ -53,10 +53,11 @@ Material:
     - _PatternStrength: 0.72
     - _PatternStretch: 9
     - _PatternThreshold: 0.4
+    - _UseFlowCoordinates: 0
     - _UseFlowMap: 0
     m_Colors:
     - _DeepColor: {r: 0, g: 0.38, b: 0.72, a: 1}
-    - _FlowDirection: {r: 1, g: 0, b: 0, a: 0}
+    - _FlowDirection: {r: -1, g: 0, b: 0, a: 0}
     - _PatternColor: {r: 0.58, g: 1.15, b: 1.35, a: 0.92}
     - _ShallowColor: {r: 0.05, g: 0.9, b: 0.95, a: 1}
   m_BuildTextureStacks: []

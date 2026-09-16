@@ -1,98 +1,118 @@
-# SPEC-009 Validation — Visual Correction
+# SPEC-009 — Current diagnosis and channel-coordinate correction
 
-SPEC-008 remains the validated runtime-data baseline. This correction addresses the visual quality of curved flow without changing the uniform-flow path.
+The previous visual approval below is **superseded**. The user reported persistent
+trajectory errors, and fresh captures reproduced streaks crossing the channel.
 
-## Root cause
+Read [Diagnosis_2026-09-16.md](Diagnosis_2026-09-16.md) for the current implementation,
+tested hypotheses, evidence, performance and limitations. The current technical
+materials enable `_UseFlowCoordinates`, requiring mesh UV2 and a UV3 flow frame.
+This is a correction for a parameterized channel, not a general arbitrary-field solver.
 
-The first SPEC-009 implementation rotated absolute pattern coordinates directly by the per-fragment Flow Map direction. Because that basis changed across the surface, the coordinate transform itself became nonlinear. Direction curvature was therefore amplified into bent streaks, arcing noise, and a marble-like deformation.
+Current comparison: `ChannelChart_Final.png`. Before: `Diagnosis_Before.png`.
 
-The original dual-phase blend was temporally bounded, but its full-pattern-unit travel distance and triangular weights made the two phases visually less correlated and gave the transition a harder cadence.
+---
 
-## Shader and advection correction
+## Historical streamline report — superseded, not current approval
 
-- Flow Map direction still drives local motion at full strength.
-- Pattern orientation uses a centred UV basis so direction changes cannot create large origin-relative displacement.
-- `_FlowMapOrientationInfluence` blends the broad local orientation with `_FlowDirection` as a stable reference. The technical materials use `0.68`.
-- Curvature no longer contributes to stretch. Effective Flow Strength remains the only driver of speed factor, stretch, visibility, and coverage.
-- Dual-phase travel is limited to `0.45` pattern units and the cycle rate is adjusted to preserve perceived speed.
-- Sin-squared complementary weights replace triangular weights, giving zero derivative at phase resets and a softer handoff.
-- The uniform-flow branch retains its original uncentred coordinates and behavior.
-- Direction and encoded-strength debug modes from SPEC-008 remain intact.
+SPEC-008 remains the runtime-data baseline. This revision replaces the previous per-fragment coordinate rotation with bounded streamline integration and rebuilds the technical Flow Maps from the channel centerline.
 
-## Flow Strength remap
+## Confirmed root cause
 
-Flow Map B is retained as the encoded debug value and is remapped once before entering the SPEC-007 system:
+The previous correction reduced deformation but still oriented pattern coordinates independently at each fragment. A local Flow Map tangent describes only the direction at one point; it does not describe the integrated route that water took to reach that point. Rotating centred UVs by that tangent therefore produced locally plausible marks whose full trajectories could curve independently of the channel.
 
-`effectiveStrength = lerp(_FlowMapMinStrength, _FlowMapMaxStrength, encodedB)`
+The shader now obtains curved motion from repeated Flow Map sampling along a backward trace. Local coordinate rotation is no longer responsible for the bend.
 
-The corrected technical materials use `0.46 -> 0.78`. The variable test map transitions smoothly from encoded `0.82` to `0.28`, producing an effective range of approximately `0.72 -> 0.55`. This keeps neighboring regions coherent while still showing progressively slower motion, shorter streaks, and lower coverage.
+## Centerline and validation channel
+
+The primary channel uses the following piecewise centerline in XZ:
+
+- `x = lerp(-10, 10, t)`;
+- `z = -3` for the straight entry (`t <= 0.25`);
+- `z = lerp(-3, 3, smoothstep(0, 1, (t - 0.25) / 0.50))` through the broad bend;
+- `z = 3` for the straight exit (`t >= 0.75`).
+
+The water, bed, left bank, right bank, and orange `Centerline_Path_Reference` mesh are generated from this same path and its analytic tangent. The water strip uses planar XZ UVs, so the Flow Map and scene geometry share one coordinate space instead of double-counting curvature through longitudinal mesh UVs.
+
+The scene defaults to the constant-strength material with the centerline visible. The separate straight uniform-flow strip remains above the channel for direct comparison.
 
 ## Technical Flow Maps
 
-Two 256 x 256 linear, uncompressed, bilinear, clamp textures were generated:
+For every texel:
 
-- `T_FlowMap_CurveConstant.png`: broad smooth direction turn with encoded strength `0.62` throughout.
-- `T_FlowMap_CurveStrength.png`: the same direction field with a separate smooth strength transition.
+1. convert texture UV to the validation channel's XZ bounds;
+2. find the nearest point on a 320-segment centerline approximation;
+3. evaluate the local analytic centerline tangent at that path parameter;
+4. convert that world tangent into planar texture-UV units and normalize it;
+5. encode the result into RG.
 
-The validated SPEC-008 map was not overwritten.
+This removes the former arbitrary UV interpolation between direction vectors. Both maps are 256 x 256, linear, uncompressed, bilinear, clamp textures:
 
-## Validation scene
+- `T_FlowMap_CurveConstant.png`: encoded B is `0.62` throughout;
+- `T_FlowMap_CurveStrength.png`: identical direction field, with a smooth `0.82 -> 0.28` B transition beginning after the bend.
 
-`WaterShader_TestScene` now contains a `SPEC009_Validation` setup:
+## Backward advection
 
-- a constant-width curved water mesh with a broad gradual bend;
-- matching left/right bank meshes and a recessed river bed;
-- a simple technical ground plane;
-- a separate straight, banked uniform-flow comparison strip;
-- a diagnostic top camera that makes the intended route immediately readable.
+Each dual-phase sample starts at the fragment's base UV and traces upstream using four fixed Euler steps. Direction is re-sampled after each of the first three steps; the initial Flow Map sample already computed by `GetFlowData` is reused for step zero.
 
-The previous scene objects remain present but inactive. No environment art or out-of-scope water feature was added.
+The two phases therefore use six additional Flow Map samples in total, or seven Flow Map samples per fragment including the initial direction/strength lookup. The pattern-source sample count is unchanged. This is a moderate, predictable SPEC-009 validation cost; it is not a simulation and does not accumulate state.
 
-## Staged visual validation
+The loop travel distance is bounded to `0.24` UV units. Flow Strength still controls speed factor, pattern stretch, visibility, and coverage. Curvature does not feed any stretch calculation.
 
-### 1. Constant strength
+## Dual-phase adaptation
 
-`MAT_Water_FlowCurve_Constant` isolates direction at nearly constant strength. The streaks follow the broad channel orientation while remaining separated and predominantly straight within each local region. The previous arcing/marble deformation is absent.
+Both half-cycle-offset phases independently backtrace the same field. Sin-squared weights preserve the soft handoff and hide each reset. Because the trace starts again from `baseUV` every frame and travel is bounded, there is no unlimited offset, accumulated deformation, or progressive phase shear.
 
-### 2. Strength transition
+## `_FlowMapOrientationInfluence`
 
-`MAT_Water_FlowCurve_Strength` uses the same direction field and changes only B. The transition is gradual; speed, stretch, and coverage change moderately without abrupt fast/slow islands.
+This property no longer blends the global direction against the local Flow Map direction and cannot weaken the curved trajectory. It is retained for material compatibility as a small phase-independent integrated pre-roll (up to 18% of the bounded loop distance), providing secondary artistic settling without local UV rotation. The technical materials use `0.8`.
 
-### 3. Uniform comparison
+The uniform-flow branch is unchanged and does not depend on this control.
 
-`MAT_Water_Uniform_Comparison` uses `_UseFlowMap = 0` and matches the clean SPEC-006/SPEC-007 pattern family. Curved flow reads as the same shader following a bend, not as a different distorted pattern.
+## Visual validation
 
-### 4. Temporal stability
+### Constant strength first
 
-A valid Play Mode run reached `130.19 s` with background execution explicitly enabled so Unity time continued while the Editor was unfocused. Captures at the start, after 60 seconds, and after 120 seconds contain different animation phases while retaining the same pattern quality.
+- the straight entry remains straight;
+- the direction debug changes only where the centerline bends;
+- streaks follow the broad S bend between the banks;
+- the exit returns to the new straight heading;
+- marks remain separated with visible negative space;
+- no unjustified counter-curve, marble pattern, or local directional jitter was observed.
+
+### Strength transition second
+
+The separate strength map was tested only after direction passed. Speed, stretch, coverage, and visibility decrease smoothly toward the exit while the trajectory remains identical to the constant-strength map.
+
+### Uniform comparison
+
+The straight comparison continues using `_UseFlowMap = 0` and retains the SPEC-006/007 appearance. The curved channel reads as the same shaped pattern transported through a spatial path rather than a separately twisted shader.
+
+### Temporal stability
+
+Play Mode ran to `132.8 s` with valid captures at startup, approximately 60 seconds, and beyond 120 seconds. Animation phases changed while pattern quality and channel alignment remained stable.
 
 Confirmed:
 
 - no visible reset pop during observation;
 - no increasing deformation or UV drift;
-- no pattern collapse;
-- no directional jitter;
-- no progressive stretch;
-- Play Mode console: 0 errors and 0 warnings;
-- no `StylizedWater` or shader compiler errors after the final shader import.
+- no pattern collapse or progressive stretch;
+- no directional jitter or discontinuity;
+- Unity console: 0 errors and 0 warnings after shader import and the extended run.
 
-Unity AI Assistant later emitted unrelated `NoSubscription` exceptions after an Editor reload; they are outside `Assets/WaterShader` and did not occur during the valid Play Mode run.
+## Current captures
 
-## Captures
+- `SPEC-009_Streamline_Constant_WithCenterline.png`
+- `SPEC-009_Streamline_Play_T00.png`
+- `SPEC-009_Streamline_Play_T60.png`
+- `SPEC-009_Streamline_Play_T120Plus.png`
+- `SPEC-009_Streamline_StrengthTransition.png`
+- `SPEC-009_Streamline_DebugDirection.png`
+- `SPEC-009_Streamline_DebugStrength.png`
 
-- `SPEC-009_Corrected_ConstantStrength.png`
-- `SPEC-009_Corrected_StrengthTransition_Final.png`
-- `SPEC-009_Corrected_UniformComparison.png`
-- `SPEC-009_Corrected_DebugDirection.png`
-- `SPEC-009_Corrected_DebugStrengthConstant.png`
-- `SPEC-009_Corrected_DebugStrengthTransition.png`
-- `SPEC-009_Corrected_PlayBG_T00.png`
-- `SPEC-009_Corrected_PlayBG_T03.png`
-- `SPEC-009_Corrected_PlayBG_T60Plus.png`
-- `SPEC-009_Corrected_PlayBG_T120Plus.png`
+## Remaining limitations
 
-## Remaining limitation
+- Four Euler steps are tuned for this broad, smooth field. Tighter bends or discontinuous production Flow Maps may require a smaller bounded travel distance, better source data, or a later quality/cost control.
+- This is a fixed technical validation generator result, not a Flow Map Baker or boundary-aware routing system.
+- The field follows the centerline and does not yet account for obstacles, colliders, bank proximity, or automatic river-to-lake strength.
 
-This is still a technical UV-space Flow Map and not a production baker. Extremely abrupt or discontinuous artist-authored vector fields can still produce poor orientation; the shader deliberately avoids an expensive runtime blur, so source-field quality remains important.
-
-Result: PASS for corrected SPEC-009 visual and temporal criteria.
+Result: corrected SPEC-009 implementation is technically and visually validated against the explicit centerline channel; final artistic approval remains with the project owner.

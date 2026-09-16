@@ -13,6 +13,7 @@ Material:
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
   m_InvalidKeywords:
+  - _USEFLOWCOORDINATES_ON
   - _USEFLOWMAP_ON
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -37,27 +38,28 @@ Material:
     - _DepthDistance: 1.6
     - _DepthFalloff: 1
     - _FlowDebugMode: 0
-    - _FlowMapMaxStrength: 0.78
+    - _FlowMapMaxStrength: 0.88
     - _FlowMapMinStrength: 0.46
-    - _FlowMapOrientationInfluence: 0.68
-    - _FlowSpeed: 0.55
-    - _FlowStrength: 0.675
+    - _FlowMapOrientationInfluence: 0.72
+    - _FlowSpeed: 0.25
+    - _FlowStrength: 0.72
     - _FlowVisualization: 1
     - _NoiseContrast: 1.55
     - _NoiseScale: 4
     - _NoiseStretch: 2.5
     - _Opacity: 0.72
     - _PatternIntensity: 0.55
-    - _PatternScale: 4
+    - _PatternScale: 2.8
     - _PatternSoftness: 0.085
     - _PatternSourceMode: 3
-    - _PatternStrength: 0.68
-    - _PatternStretch: 8
-    - _PatternThreshold: 0.46
+    - _PatternStrength: 0.72
+    - _PatternStretch: 9
+    - _PatternThreshold: 0.4
+    - _UseFlowCoordinates: 1
     - _UseFlowMap: 1
     m_Colors:
     - _DeepColor: {r: 0, g: 0.38, b: 0.72, a: 1}
-    - _FlowDirection: {r: 1, g: 0, b: 0, a: 0}
+    - _FlowDirection: {r: -1, g: 0, b: 0, a: 0}
     - _PatternColor: {r: 0.58, g: 1.15, b: 1.35, a: 0.92}
     - _ShallowColor: {r: 0.05, g: 0.9, b: 0.95, a: 1}
   m_BuildTextureStacks: []
