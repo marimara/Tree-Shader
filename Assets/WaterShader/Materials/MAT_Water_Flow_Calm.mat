@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: MAT_Water_Test
+  m_Name: MAT_Water_Flow_Calm
   m_Shader: {fileID: 4800000, guid: da64afb70dae2414f90689b849fff2a5, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -32,7 +32,7 @@ Material:
     - _DepthDistance: 1.6
     - _DepthFalloff: 1
     - _FlowSpeed: 0.8
-    - _FlowStrength: 0.66
+    - _FlowStrength: 0
     - _FlowVisualization: 1
     - _NoiseContrast: 1.55
     - _NoiseScale: 4

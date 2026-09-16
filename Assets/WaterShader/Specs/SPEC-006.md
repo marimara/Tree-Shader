@@ -6,15 +6,35 @@
 
 # 
 
-# Transform the pattern source selected in SPEC-005 into the project's stylized directional water pattern.
+# Transform the hybrid pattern source selected in SPEC-005 into the project's actual stylized directional water language.
 
 # 
 
-# This is the first Spec focused on the actual visual language of moving water.
+# SPEC-005 established that the hybrid approach using the selected Noise 1 texture is the preferred pattern source.
 
 # 
 
-# The shader should begin to resemble the visual references without implementing foam or waterfall-specific effects.
+# SPEC-006 must now convert that raw moving noise into deliberate, clean, stylized water marks.
+
+# 
+
+# The result should no longer read primarily as:
+
+# 
+
+# "noise moving across a surface."
+
+# 
+
+# It should begin to read as:
+
+# 
+
+# "stylized directional water highlights moving with the current."
+
+# 
+
+# Do not implement foam, Flow Maps, waterfall particles, reflection, refraction, or other later systems.
 
 # 
 
@@ -26,7 +46,13 @@
 
 # 
 
-# Requires completed and validated SPEC-005.
+# Requires completed and validated:
+
+# 
+
+# \- SPEC-004
+
+# \- SPEC-005
 
 # 
 
@@ -34,11 +60,37 @@
 
 # 
 
-# Use the pattern-source approach selected during SPEC-005.
+# Use the pattern-source approach selected in SPEC-005:
 
 # 
 
-# Do not restart the pattern-source architecture unless validation showed a technical problem.
+# hybrid texture + procedural shaping
+
+# 
+
+# using the selected Noise 1 texture as the primary authored noise source.
+
+# 
+
+# Do not restart the pattern-source comparison unless the validated implementation is technically unusable.
+
+# 
+
+# Preserve:
+
+# 
+
+# \- depth-based coloring;
+
+# \- shallow/deep colors;
+
+# \- opacity;
+
+# \- uniform flow direction;
+
+# \- flow speed;
+
+# \- WaterShader\_TestScene.
 
 # 
 
@@ -46,11 +98,49 @@
 
 # 
 
-# \# Visual Target
+# \# Primary Visual Problem
 
 # 
 
-# Use the visual references stored in:
+# The current SPEC-005 result is technically functional but visually still too close to raw animated noise.
+
+# 
+
+# SPEC-006 must reduce that impression.
+
+# 
+
+# The pattern should become:
+
+# 
+
+# \- cleaner;
+
+# \- more graphic;
+
+# \- more selective;
+
+# \- more directional;
+
+# \- less continuously noisy;
+
+# \- easier to read from a distance.
+
+# 
+
+# The shader should create intentional highlight marks rather than displaying most of the noise texture directly.
+
+# 
+
+# \---
+
+# 
+
+# \# Visual References
+
+# 
+
+# Use the visual references in:
 
 # 
 
@@ -58,43 +148,33 @@
 
 # 
 
-# Target characteristics:
+# The references are visual targets only.
 
 # 
 
-# \- clear directional movement;
-
-# \- elongated highlight-like shapes;
-
-# \- large readable forms;
-
-# \- limited fine noise;
-
-# \- irregular but controlled shapes;
-
-# \- graphic stylized appearance;
-
-# \- clean negative space;
-
-# \- suitable for both river and waterfall stretching.
+# Do not attempt to reproduce or reverse-engineer a commercial shader.
 
 # 
 
-# Avoid:
+# Focus on these characteristics:
 
 # 
 
-# \- realistic ocean detail;
+# \- strong readable directional motion;
 
-# \- tiny noisy grain;
+# \- isolated highlight-like streaks;
 
-# \- marble appearance;
+# \- elongated painterly shapes;
 
-# \- cloud-like patterns;
+# \- large and medium forms rather than fine grain;
 
-# \- uniform sine-wave bands;
+# \- visible negative space between marks;
 
-# \- overly dense surface detail.
+# \- controlled irregularity;
+
+# \- bright cyan / pale cyan / near-white highlights;
+
+# \- clearly stylized game-art appearance.
 
 # 
 
@@ -102,15 +182,51 @@
 
 # 
 
-# \# Pattern Shaping
+# \# Important Visual Requirement
 
 # 
 
-# Create controls that transform the base noise into stylized water marks.
+# The final pattern must not cover the surface uniformly.
 
 # 
 
-# Expected techniques may include:
+# There must be visible regions where little or no pattern is present.
+
+# 
+
+# The pattern should behave more like:
+
+# 
+
+# "moving stylized highlights"
+
+# 
+
+# than:
+
+# 
+
+# "continuous animated texture."
+
+# 
+
+# Avoid a surface that looks completely filled with moving noise.
+
+# 
+
+# \---
+
+# 
+
+# \# Pattern Shaping Pipeline
+
+# 
+
+# Build a clear shaping pipeline from the selected hybrid source.
+
+# 
+
+# The implementation may use:
 
 # 
 
@@ -122,19 +238,91 @@
 
 # \- thresholding;
 
-# \- directional scaling;
+# \- directional UV scaling;
 
-# \- UV stretching;
+# \- flow-relative stretching;
 
-# \- selective masking.
+# \- procedural distortion;
+
+# \- selective masking;
+
+# \- multiplication between pattern layers.
 
 # 
 
-# Do not assume all techniques are required.
+# Use only the operations that materially improve the result.
 
 # 
 
-# Use the simplest combination that achieves the target.
+# Do not add complexity for its own sake.
+
+# 
+
+# A conceptual pipeline may resemble:
+
+# 
+
+# raw pattern
+
+# → directional UV transform
+
+# → stretch
+
+# → contrast / remap
+
+# → threshold or Smoothstep
+
+# → selective highlight mask
+
+# → pattern color / intensity
+
+# 
+
+# The exact implementation may differ.
+
+# 
+
+# \---
+
+# 
+
+# \# Threshold and Coverage
+
+# 
+
+# The shader must provide a way to control how much of the surface receives visible pattern.
+
+# 
+
+# Expose a control equivalent to:
+
+# 
+
+# \_PatternThreshold
+
+# 
+
+# This control should allow the pattern to move between:
+
+# 
+
+# \- broad high-coverage noise;
+
+# \- cleaner separated marks;
+
+# \- sparse isolated highlights.
+
+# 
+
+# Expose a softness control if required:
+
+# 
+
+# \_PatternSoftness
+
+# 
+
+# Threshold and softness should work together without producing severe aliasing or harsh pixel noise.
 
 # 
 
@@ -158,23 +346,63 @@
 
 # \_PatternColor
 
-# 
-
-# Also expose threshold / softness controls if required by the selected shaping technique.
-
-# 
-
-# Example:
-
-# 
-
 # \_PatternThreshold
+
+# 
+
+# Add:
+
+# 
 
 # \_PatternSoftness
 
 # 
 
-# Avoid redundant controls.
+# if it materially improves the threshold transition.
+
+# 
+
+# Exact internal names may differ if there is a clear technical reason.
+
+# 
+
+# Avoid duplicate controls affecting the same behavior.
+
+# 
+
+# \---
+
+# 
+
+# \# Pattern Scale
+
+# 
+
+# Pattern Scale should control the overall size of the visible water marks.
+
+# 
+
+# Lower-frequency / larger forms are preferred.
+
+# 
+
+# Avoid defaults dominated by tiny repeated details.
+
+# 
+
+# The default result should contain a readable mixture of:
+
+# 
+
+# \- a few larger forms;
+
+# \- medium directional forms;
+
+# \- limited small detail.
+
+# 
+
+# Do not make fine noise the dominant visual component.
 
 # 
 
@@ -186,35 +414,45 @@
 
 # 
 
-# Pattern Stretch must act relative to flow direction.
+# Pattern Stretch must operate relative to Flow Direction.
 
 # 
 
-# Low values:
+# It must not simply stretch texture-space X or Y regardless of current direction.
 
 # 
 
-# \- broader;
-
-# \- softer;
-
-# \- less directional.
+# Low Stretch:
 
 # 
 
-# High values:
+# \- broader forms;
+
+# \- softer directional character;
+
+# \- less obvious streaking.
 
 # 
 
-# \- elongated;
-
-# \- clearly directional;
-
-# \- suitable for rapid water / waterfall-like streaks.
+# Medium Stretch:
 
 # 
 
-# Changing Flow Direction should also rotate/reorient the effective pattern behavior appropriately.
+# \- clear river-like directional highlights.
+
+# 
+
+# High Stretch:
+
+# 
+
+# \- long directional streaks;
+
+# \- suitable as a base for fast water and future waterfall behavior.
+
+# 
+
+# Changing Flow Direction must also change the effective orientation of the stretched pattern.
 
 # 
 
@@ -226,15 +464,109 @@
 
 # 
 
-# The pattern should act as a stylized highlight/detail layer over the existing depth-based water color.
+# The shaped pattern should be applied as a highlight/detail layer over the existing depth-based water color.
 
 # 
 
-# Use a light cyan / near-white default.
+# Use a light cyan / pale cyan / near-white default.
 
 # 
 
-# Do not replace the shallow/deep color system.
+# Pattern Color must not replace:
+
+# 
+
+# \- Shallow Color;
+
+# \- Deep Color;
+
+# \- depth-based blending.
+
+# 
+
+# The base water body should remain clearly visible beneath the pattern.
+
+# 
+
+# \---
+
+# 
+
+# \# Pattern Strength
+
+# 
+
+# Pattern Strength should control the contribution of the stylized highlights.
+
+# 
+
+# At low values:
+
+# 
+
+# \- pattern is subtle.
+
+# 
+
+# At medium values:
+
+# 
+
+# \- pattern is clearly readable but does not dominate the whole surface.
+
+# 
+
+# At high values:
+
+# 
+
+# \- pattern becomes strong enough for fast-flow / waterfall-like testing.
+
+# 
+
+# Avoid default values that make the water mostly white.
+
+# 
+
+# \---
+
+# 
+
+# \# Negative Space
+
+# 
+
+# Negative space is a required part of the visual target.
+
+# 
+
+# At the default River-like configuration:
+
+# 
+
+# \- large portions of the water base color should remain visible;
+
+# \- highlight marks should be visually separated;
+
+# \- the result should not resemble marble;
+
+# \- the result should not resemble an evenly distributed noise field.
+
+# 
+
+# If the pattern looks too dense, prefer:
+
+# 
+
+# \- thresholding;
+
+# \- scale adjustment;
+
+# \- selective masking;
+
+# 
+
+# before adding more texture samples.
 
 # 
 
@@ -246,11 +578,19 @@
 
 # 
 
-# If the chosen pattern source benefits from multiple samples, a second sample is allowed.
+# A second sample from the same selected source is allowed only if it clearly improves:
 
 # 
 
-# Possible differences:
+# \- breakup;
+
+# \- repetition;
+
+# \- shape variety.
+
+# 
+
+# If used, the second sample may vary in:
 
 # 
 
@@ -264,11 +604,15 @@
 
 # 
 
-# Do not use multiple samples by default unless they materially improve the visual result.
+# Do not automatically use two layers.
 
 # 
 
-# Keep the pattern readable.
+# Start with the minimum required setup.
+
+# 
+
+# If one hybrid layer is sufficient, keep one.
 
 # 
 
@@ -276,11 +620,59 @@
 
 # 
 
-# \# Calm / River / Waterfall Test Presets
+# \# Procedural Distortion
 
 # 
 
-# Validate manually using at least three temporary configurations.
+# The existing hybrid approach may retain inexpensive procedural distortion.
+
+# 
+
+# Distortion should:
+
+# 
+
+# \- break repetition;
+
+# \- add slight organic variation;
+
+# \- avoid making the pattern look wavy or chaotic.
+
+# 
+
+# Avoid distortion strong enough to create:
+
+# 
+
+# \- obvious S-shaped waves;
+
+# \- marble patterns;
+
+# \- turbulent noise unrelated to Flow Direction.
+
+# 
+
+# \---
+
+# 
+
+# \# Calm / River / Fast Flow Test Presets
+
+# 
+
+# Create or validate three manual visual states.
+
+# 
+
+# These are temporary validation states only.
+
+# 
+
+# Automatic control belongs to SPEC-007.
+
+# 
+
+# \---
 
 # 
 
@@ -288,11 +680,39 @@
 
 # 
 
-# \- low speed;
+# Use:
 
-# \- low stretch;
+# 
 
-# \- low pattern strength.
+# \- low Flow Speed;
+
+# \- low Pattern Stretch;
+
+# \- low Pattern Strength;
+
+# \- relatively broad pattern forms;
+
+# \- sparse visible highlights.
+
+# 
+
+# Target:
+
+# 
+
+# \- subtle moving water;
+
+# \- no impression of fast current;
+
+# \- broad clean visual language.
+
+# 
+
+# Do not attempt final calm-water behavior yet.
+
+# 
+
+# \---
 
 # 
 
@@ -300,31 +720,131 @@
 
 # 
 
-# \- medium speed;
-
-# \- medium stretch;
-
-# \- medium pattern strength.
+# Use:
 
 # 
 
-# \## Waterfall-like
+# \- medium Flow Speed;
+
+# \- medium Pattern Stretch;
+
+# \- medium Pattern Strength;
+
+# \- threshold producing separated directional highlights.
 
 # 
 
-# \- high speed;
-
-# \- high stretch;
-
-# \- stronger pattern visibility.
+# This is the most important visual target for SPEC-006.
 
 # 
 
-# These are manual test states only.
+# The river state should clearly move closer to the visual references.
 
 # 
 
-# Automatic transition belongs to SPEC-007.
+# Target:
+
+# 
+
+# \- readable directional streaks;
+
+# \- clean gaps between marks;
+
+# \- large stylized forms;
+
+# \- minimal fine noise;
+
+# \- no raw-noise appearance.
+
+# 
+
+# \---
+
+# 
+
+# \## Fast / Waterfall-like
+
+# 
+
+# Use:
+
+# 
+
+# \- high Flow Speed;
+
+# \- high Pattern Stretch;
+
+# \- stronger Pattern Strength;
+
+# \- elongated highlight forms.
+
+# 
+
+# Target:
+
+# 
+
+# \- long directional streaks;
+
+# \- visually strong motion;
+
+# \- useful base for future waterfall work.
+
+# 
+
+# Do not add:
+
+# 
+
+# \- foam;
+
+# \- waterfall edge masks;
+
+# \- particles;
+
+# \- impact effects.
+
+# 
+
+# \---
+
+# 
+
+# \# Comparison Against SPEC-005
+
+# 
+
+# SPEC-006 validation should explicitly compare the shaped result against the raw SPEC-005 hybrid result.
+
+# 
+
+# The improvement should be visible.
+
+# 
+
+# SPEC-006 should reduce:
+
+# 
+
+# \- continuous noise appearance;
+
+# \- visual clutter;
+
+# \- even surface coverage.
+
+# 
+
+# SPEC-006 should increase:
+
+# 
+
+# \- shape intentionality;
+
+# \- negative space;
+
+# \- directional readability;
+
+# \- clean stylized highlight forms.
 
 # 
 
@@ -340,25 +860,49 @@
 
 # 
 
-# \- patterns follow flow direction;
+# \- Flow Direction still controls movement direction;
 
-# \- patterns stretch in the flow direction;
+# \- Flow Speed still works;
 
-# \- pattern scale remains controllable;
+# \- pattern orientation follows Flow Direction;
 
-# \- threshold / shaping produces clean forms;
+# \- Pattern Stretch follows Flow Direction;
 
-# \- the result remains readable at a distance;
+# \- Pattern Scale is controllable;
 
-# \- the river configuration begins resembling the intended visual references;
+# \- Pattern Threshold changes visible coverage;
 
-# \- strong stretch produces useful waterfall-like streaks;
+# \- Pattern Strength changes visual contribution;
 
-# \- low stretch does not look obviously broken.
+# \- thresholding does not create severe aliasing;
+
+# \- the default River-like state is cleaner than the SPEC-005 raw hybrid state;
+
+# \- strong stretch produces useful long streaks;
+
+# \- low stretch produces broad shapes without obvious artifacts;
+
+# \- depth coloring remains fully functional;
+
+# \- opacity remains functional.
 
 # 
 
 # Capture comparison validation.
+
+# 
+
+# Recommended captures:
+
+# 
+
+# \- raw SPEC-005 hybrid;
+
+# \- SPEC-006 Calm-like;
+
+# \- SPEC-006 River-like;
+
+# \- SPEC-006 Fast-like.
 
 # 
 
@@ -370,15 +914,41 @@
 
 # 
 
-# Use only assets selected during SPEC-005.
+# Use the existing pattern assets selected during SPEC-005.
 
 # 
 
-# Do not add another pattern/noise texture unless the existing source demonstrably cannot produce the required result.
+# Do not create or import new:
 
 # 
 
-# If another external texture appears necessary, stop and report the need before creating/importing it.
+# \- noise textures;
+
+# \- distortion textures;
+
+# \- alpha textures;
+
+# \- masks;
+
+# \- foam textures;
+
+# \- normal maps.
+
+# 
+
+# If the selected Noise 1 source demonstrably cannot produce the required result even after reasonable shaping, stop and report:
+
+# 
+
+# \- what failed visually;
+
+# \- what additional asset would be required;
+
+# \- why the existing source is insufficient.
+
+# 
+
+# Do not silently add another texture.
 
 # 
 
@@ -394,17 +964,25 @@
 
 # 
 
-# \- the raw noise source has been transformed into deliberate stylized water marks;
+# \- the hybrid noise source has been transformed into deliberate stylized water highlights;
 
-# \- direction and stretch behave correctly;
+# \- the surface no longer primarily reads as raw moving noise;
 
-# \- calm-like, river-like, and waterfall-like manual presets are visually distinct;
+# \- River-like behavior clearly shows separated directional streaks;
 
-# \- the pattern remains part of the same visual family across these states;
+# \- visible negative space exists between highlight marks;
+
+# \- Pattern Stretch behaves relative to flow direction;
+
+# \- Pattern Threshold provides useful control over pattern coverage;
+
+# \- Calm-like, River-like, and Fast-like manual states are visibly different;
+
+# \- all three remain part of the same visual language;
 
 # \- depth-based coloring remains functional;
 
-# \- no foam or other future effects were added.
+# \- no foam or later-system features were introduced.
 
 # 
 
@@ -424,19 +1002,25 @@
 
 # \- Flow Maps;
 
+# \- local curved flow;
+
 # \- foam;
 
 # \- intersection foam;
 
+# \- waterfall foam;
+
+# \- waterfall edge masks;
+
+# \- waterfall particles;
+
 # \- waves;
 
-# \- normals;
-
-# \- refraction;
+# \- custom normals;
 
 # \- reflection;
 
-# \- waterfall particles;
+# \- refraction;
 
 # \- interaction.
 

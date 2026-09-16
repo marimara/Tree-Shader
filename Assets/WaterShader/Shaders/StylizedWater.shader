@@ -9,12 +9,19 @@ Shader "Meganeura/Water/Stylized Water"
         _Opacity ("Opacity", Range(0.0, 1.0)) = 0.72
         _FlowDirection ("Flow Direction", Vector) = (1.0, 0.0, 0.0, 0.0)
         _FlowSpeed ("Flow Speed", Range(0.0, 5.0)) = 0.35
-        [Enum(Procedural, 0, Texture, 1, Hybrid, 2)] _PatternSourceMode ("Pattern Source Mode", Float) = 2.0
+        _FlowStrength ("Flow Strength", Range(0.0, 1.0)) = 0.66
+        [Enum(Procedural, 0, Texture, 1, Raw Hybrid, 2, Shaped Hybrid, 3)] _PatternSourceMode ("Pattern Source Mode", Float) = 3.0
         [NoScaleOffset] _NoiseTex ("Noise Texture", 2D) = "gray" {}
-        _NoiseScale ("Noise Scale", Range(0.1, 10.0)) = 2.0
+        _PatternScale ("Pattern Scale", Range(0.1, 10.0)) = 2.2
+        _PatternStrength ("Pattern Strength", Range(0.0, 1.0)) = 0.55
+        _PatternStretch ("Pattern Stretch", Range(1.0, 12.0)) = 4.0
+        [HDR] _PatternColor ("Pattern Color", Color) = (0.62, 1.15, 1.30, 0.85)
+        _PatternThreshold ("Pattern Threshold", Range(0.0, 1.0)) = 0.62
+        _PatternSoftness ("Pattern Softness", Range(0.01, 0.25)) = 0.075
+        [HideInInspector] _NoiseScale ("Legacy Noise Scale", Range(0.1, 10.0)) = 2.0
         _NoiseContrast ("Noise Contrast", Range(0.1, 4.0)) = 1.35
-        _NoiseStretch ("Noise Stretch", Range(1.0, 8.0)) = 2.5
-        _PatternIntensity ("Pattern Intensity", Range(0.0, 1.0)) = 0.45
+        [HideInInspector] _NoiseStretch ("Legacy Noise Stretch", Range(1.0, 8.0)) = 2.5
+        [HideInInspector] _PatternIntensity ("Legacy Pattern Intensity", Range(0.0, 1.0)) = 0.45
     }
 
     SubShader
@@ -51,7 +58,14 @@ Shader "Meganeura/Water/Stylized Water"
                 half _Opacity;
                 float4 _FlowDirection;
                 half _FlowSpeed;
+                half _FlowStrength;
                 half _PatternSourceMode;
+                half _PatternScale;
+                half _PatternStrength;
+                half _PatternStretch;
+                half4 _PatternColor;
+                half _PatternThreshold;
+                half _PatternSoftness;
                 half _NoiseScale;
                 half _NoiseContrast;
                 half _NoiseStretch;
@@ -85,7 +99,9 @@ Shader "Meganeura/Water/Stylized Water"
             float2 GetAnimatedFlowUV(float2 baseUV)
             {
                 float2 normalizedFlowDirection = GetUniformFlowDirection(_FlowDirection.xy);
-                return baseUV + normalizedFlowDirection * _FlowSpeed * _Time.y;
+                half flowCharacter = smoothstep(0.0h, 1.0h, saturate(_FlowStrength));
+                half effectiveSpeedFactor = _PatternSourceMode < 2.5h ? 1.0h : lerp(0.06h, 1.0h, flowCharacter);
+                return baseUV + normalizedFlowDirection * _FlowSpeed * effectiveSpeedFactor * _Time.y;
             }
 
             float2 GetDirectionalPatternUV(float2 animatedUV)
@@ -94,9 +110,14 @@ Shader "Meganeura/Water/Stylized Water"
                 float hasDirection = step(0.000001, dot(flowDirection, flowDirection));
                 float2 patternDirection = lerp(float2(1.0, 0.0), flowDirection, hasDirection);
                 float2 patternPerpendicular = float2(-patternDirection.y, patternDirection.x);
-                float alongFlow = dot(animatedUV, patternDirection) / max(_NoiseStretch, 0.0001h);
+                half flowCharacter = smoothstep(0.0h, 1.0h, saturate(_FlowStrength));
+                half shapedStretch = lerp(1.15h, _PatternStretch, flowCharacter);
+                half shapedScale = _PatternScale * lerp(0.58h, 1.0h, flowCharacter);
+                half effectiveStretch = _PatternSourceMode < 2.5h ? _NoiseStretch : shapedStretch;
+                half effectiveScale = _PatternSourceMode < 2.5h ? _NoiseScale : shapedScale;
+                float alongFlow = dot(animatedUV, patternDirection) / max(effectiveStretch, 0.0001h);
                 float acrossFlow = dot(animatedUV, patternPerpendicular);
-                return float2(alongFlow, acrossFlow) * _NoiseScale;
+                return float2(alongFlow, acrossFlow) * effectiveScale;
             }
 
             half ProceduralNoise(float2 uv)
@@ -131,6 +152,30 @@ Shader "Meganeura/Water/Stylized Water"
                 return smoothstep(0.22h, 0.78h, ApplyPatternContrast(combinedNoise));
             }
 
+            half GetShapedHybridPattern(float2 patternUV)
+            {
+                // Noise 1 supplies the authored silhouette. A low-frequency analytic
+                // field only bends it slightly and gates it into separated marks.
+                half distortionField = ProceduralNoise(patternUV * 0.38h + float2(4.7h, 11.3h));
+                float2 distortedUV = patternUV + float2(distortionField - 0.5h, 0.5h - distortionField) * 0.12h;
+                half authoredNoise = SAMPLE_TEXTURE2D(_NoiseTex, sampler_NoiseTex, distortedUV).r;
+                half shapedSource = saturate((authoredNoise - 0.5h) * _NoiseContrast + 0.5h);
+
+                half flowCharacter = smoothstep(0.0h, 1.0h, saturate(_FlowStrength));
+                half effectiveThreshold = saturate(_PatternThreshold + lerp(0.16h, -0.10h, flowCharacter));
+                half edgeSoftness = max(_PatternSoftness * lerp(1.35h, 1.0h, flowCharacter), 0.005h);
+                half thresholdMask = smoothstep(
+                    effectiveThreshold - edgeSoftness,
+                    effectiveThreshold + edgeSoftness,
+                    shapedSource);
+
+                half selectiveField = ProceduralNoise(patternUV * float2(0.42h, 0.58h) + float2(19.1h, 3.4h));
+                half selectiveLow = lerp(0.54h, 0.22h, flowCharacter);
+                half selectiveHigh = lerp(0.78h, 0.56h, flowCharacter);
+                half selectiveMask = smoothstep(selectiveLow, selectiveHigh, selectiveField);
+                return thresholdMask * selectiveMask;
+            }
+
             half GetPatternSource(float2 patternUV)
             {
                 if (_PatternSourceMode < 0.5h)
@@ -139,7 +184,10 @@ Shader "Meganeura/Water/Stylized Water"
                 if (_PatternSourceMode < 1.5h)
                     return GetTexturePattern(patternUV);
 
-                return GetHybridPattern(patternUV);
+                if (_PatternSourceMode < 2.5h)
+                    return GetHybridPattern(patternUV);
+
+                return GetShapedHybridPattern(patternUV);
             }
 
             Varyings Vert(Attributes input)
@@ -171,8 +219,18 @@ Shader "Meganeura/Water/Stylized Water"
                 float2 animatedFlowUV = GetAnimatedFlowUV(input.uv);
                 float2 patternUV = GetDirectionalPatternUV(animatedFlowUV);
                 half pattern = GetPatternSource(patternUV);
-                half patternBrightness = lerp(0.76h, 1.22h, pattern);
-                waterColor.rgb *= lerp(1.0h, patternBrightness, saturate(_PatternIntensity));
+                if (_PatternSourceMode < 2.5h)
+                {
+                    half patternBrightness = lerp(0.76h, 1.22h, pattern);
+                    waterColor.rgb *= lerp(1.0h, patternBrightness, saturate(_PatternIntensity));
+                }
+                else
+                {
+                    half flowCharacter = smoothstep(0.0h, 1.0h, saturate(_FlowStrength));
+                    half effectivePatternStrength = _PatternStrength * lerp(0.22h, 1.0h, flowCharacter);
+                    half highlightContribution = saturate(pattern * effectivePatternStrength * _PatternColor.a);
+                    waterColor.rgb = lerp(waterColor.rgb, _PatternColor.rgb, highlightContribution);
+                }
 
                 return half4(waterColor.rgb, saturate(waterColor.a * _Opacity));
             }

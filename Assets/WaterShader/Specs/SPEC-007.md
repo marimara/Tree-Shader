@@ -6,7 +6,7 @@
 
 # 
 
-# Introduce Flow Strength as the central parameter controlling the perceived velocity and visual character of the water.
+# Introduce Flow Strength as the central parameter controlling the perceived velocity and visual character of the stylized water pattern created in SPEC-006.
 
 # 
 
@@ -24,7 +24,23 @@
 
 # 
 
-# The transition must alter the visual character of the pattern, not merely animation speed.
+# Flow Strength must change the character of the pattern.
+
+# 
+
+# It must not simply slow down or accelerate the same visual texture.
+
+# 
+
+# The goal is to establish the first convincing:
+
+# 
+
+# Calm Water ↔ River ↔ Fast Flow
+
+# 
+
+# continuum.
 
 # 
 
@@ -45,6 +61,34 @@
 # \- SPEC-005
 
 # \- SPEC-006
+
+# 
+
+# Use the shaped pattern architecture produced by SPEC-006.
+
+# 
+
+# Do not rebuild the pattern system from scratch.
+
+# 
+
+# Preserve:
+
+# 
+
+# \- depth-based coloring;
+
+# \- Shallow Color;
+
+# \- Deep Color;
+
+# \- opacity;
+
+# \- Flow Direction;
+
+# \- Flow Speed;
+
+# \- stylized pattern controls.
 
 # 
 
@@ -76,11 +120,23 @@
 
 # 
 
-# 0 = calm / nearly still
+# 0 = nearly still / calm water
 
 # 
 
-# 1 = maximum directional flow
+# 1 = maximum strong directional flow
+
+# 
+
+# Flow Strength represents local perceived water movement.
+
+# 
+
+# For this Spec it is still a uniform material property.
+
+# 
+
+# Spatial Flow Map control belongs to later Specs.
 
 # 
 
@@ -88,19 +144,25 @@
 
 # 
 
-# \# Flow Strength Responsibilities
+# \# Core Principle
 
 # 
 
-# Flow Strength must affect at minimum:
+# Flow Strength must affect more than animation speed.
+
+# 
+
+# At minimum, Flow Strength must drive:
 
 # 
 
 # 1\. effective flow speed;
 
-# 2\. directional pattern stretch;
+# 2\. directional Pattern Stretch;
 
-# 3\. pattern strength / visibility.
+# 3\. Pattern Strength / visibility;
+
+# 4\. effective pattern coverage or threshold behavior.
 
 # 
 
@@ -108,21 +170,21 @@
 
 # 
 
-# \- threshold;
+# \- Pattern Scale;
+
+# \- Pattern Softness;
+
+# \- procedural distortion;
 
 # \- secondary pattern contribution;
 
-# \- distortion;
+# 
 
-# \- pattern scale;
+# if these improve the transition.
 
 # 
 
-# if this improves the transition.
-
-# 
-
-# Do not make unnecessary controls dependent on Flow Strength.
+# Do not connect every parameter to Flow Strength without visual justification.
 
 # 
 
@@ -130,15 +192,171 @@
 
 # 
 
-# \# Calm Water Requirement
+# \# Base Flow Speed
 
 # 
 
-# At Flow Strength = 0:
+# \_FlowSpeed should remain the artist-facing maximum or base speed control.
 
 # 
 
-# Water must not look like a paused river texture.
+# Flow Strength should modulate the effective speed.
+
+# 
+
+# Conceptually:
+
+# 
+
+# effectiveFlowSpeed =
+
+# &#x20;   function(FlowSpeed, FlowStrength)
+
+# 
+
+# Do not remove the ability to tune Flow Speed.
+
+# 
+
+# Flow Strength defines the state.
+
+# 
+
+# Flow Speed defines the overall speed range.
+
+# 
+
+# \---
+
+# 
+
+# \# Pattern Character Transition
+
+# 
+
+# Flow Strength should gradually transform the pattern.
+
+# 
+
+# The intended conceptual transition is:
+
+# 
+
+# low Flow Strength
+
+# → broad / sparse / subtle / slow
+
+# 
+
+# medium Flow Strength
+
+# → directional / readable / moderately stretched
+
+# 
+
+# high Flow Strength
+
+# → elongated / strong / fast
+
+# 
+
+# Avoid changing only Time speed.
+
+# 
+
+# \---
+
+# 
+
+# \# Flow Strength = 0 — Calm
+
+# 
+
+# At:
+
+# 
+
+# Flow Strength = 0
+
+# 
+
+# The water should appear calm or nearly still.
+
+# 
+
+# Required characteristics:
+
+# 
+
+# \- very slow residual movement;
+
+# \- broad pattern forms;
+
+# \- minimal directional elongation;
+
+# \- low highlight coverage;
+
+# \- low Pattern Strength;
+
+# \- strong visible areas of base water color;
+
+# \- subtle visual activity.
+
+# 
+
+# The surface must not be completely frozen.
+
+# 
+
+# A minimal baseline motion is allowed and encouraged.
+
+# 
+
+# \---
+
+# 
+
+# \# Critical Calm-Water Rule
+
+# 
+
+# The calm state must not look like:
+
+# 
+
+# "the river pattern with Time almost stopped."
+
+# 
+
+# It should visually change shape and coverage.
+
+# 
+
+# Compared to River state, Calm should have:
+
+# 
+
+# \- broader marks;
+
+# \- fewer visible directional streaks;
+
+# \- less pattern coverage;
+
+# \- softer visual directionality;
+
+# \- lower contrast or intensity where useful.
+
+# 
+
+# The base depth-colored water should dominate.
+
+# 
+
+# \---
+
+# 
+
+# \# Flow Strength ≈ 0.25–0.35 — Slow Water
 
 # 
 
@@ -146,47 +364,29 @@
 
 # 
 
-# \- very slow residual motion;
-
-# \- broad shapes;
-
-# \- minimal directional streaking;
-
-# \- lower pattern prominence;
-
-# \- calm visual impression.
-
-# 
-
-# The surface should remain subtly alive.
-
-# 
-
-# \---
-
-# 
-
-# \# Slow Flow
-
-# 
-
-# Around:
-
-# 
-
-# Flow Strength = 0.3
-
-# 
-
-# Expected:
-
-# 
-
 # \- gentle directional movement;
 
-# \- broad but slightly stretched shapes;
+# \- broad highlight forms;
 
-# \- clear indication that the surface is moving.
+# \- slightly increased stretch;
+
+# \- slightly increased coverage;
+
+# \- clearly alive surface;
+
+# \- no impression of rapids.
+
+# 
+
+# This range should feel appropriate for:
+
+# 
+
+# \- slow streams;
+
+# \- gentle transitions;
+
+# \- water approaching a lake.
 
 # 
 
@@ -194,37 +394,41 @@
 
 # 
 
-# \# River
+# \# Flow Strength ≈ 0.55–0.70 — River
 
 # 
 
-# Around:
+# This is the primary River target.
 
 # 
 
-# Flow Strength = 0.6
+# Expected characteristics:
 
 # 
 
-# Expected:
+# \- clearly readable directional movement;
 
-# 
+# \- medium-to-strong Pattern Stretch;
 
-# \- clearly directional pattern;
+# \- clearly separated highlight streaks;
 
-# \- moderate-to-strong stretch;
+# \- moderate Pattern Strength;
 
-# \- visually readable current;
+# \- clean negative space;
 
 # \- medium animation speed.
 
 # 
 
+# The pattern should resemble the SPEC-006 River-like validation state.
+
+# 
+
 # \---
 
 # 
 
-# \# Fast Flow
+# \# Flow Strength = 1 — Fast Flow
 
 # 
 
@@ -236,21 +440,35 @@
 
 # 
 
-# Expected:
+# Expected characteristics:
 
 # 
 
 # \- strong directional animation;
 
-# \- highly elongated pattern;
+# \- high Pattern Stretch;
 
-# \- strong flow readability;
+# \- clearly elongated streaks;
 
-# \- useful foundation for later rapids and waterfall behavior.
+# \- increased pattern visibility;
+
+# \- high motion readability.
 
 # 
 
-# Do not add foam or particles.
+# This state should provide a useful visual foundation for:
+
+# 
+
+# \- rapids;
+
+# \- waterfall surfaces;
+
+# \- later foam systems.
+
+# 
+
+# Do not add foam or waterfall-specific effects.
 
 # 
 
@@ -258,19 +476,221 @@
 
 # 
 
-# \# Transition Model
+# \# Smooth Transition
 
 # 
 
-# Flow Strength should interpolate smoothly between states.
+# Flow Strength should behave continuously.
 
 # 
 
-# Avoid obvious hard state switches.
+# Avoid:
 
 # 
 
-# The system should behave as a continuum.
+# \- hard visual state switches;
+
+# \- sudden threshold jumps;
+
+# \- visible discontinuities;
+
+# \- obvious popping.
+
+# 
+
+# Interpolation may be linear or shaped with smooth nonlinear functions if that produces better results.
+
+# 
+
+# Use Smoothstep or similar shaping where appropriate.
+
+# 
+
+# \---
+
+# 
+
+# \# Threshold Behavior
+
+# 
+
+# Because SPEC-006 uses pattern thresholding to create separated highlight marks, Flow Strength should control coverage intelligently.
+
+# 
+
+# Suggested behavior:
+
+# 
+
+# Calm:
+
+# \- higher threshold / lower coverage.
+
+# 
+
+# River:
+
+# \- moderate threshold / moderate coverage.
+
+# 
+
+# Fast:
+
+# \- slightly more visible pattern.
+
+# 
+
+# Do not increase coverage so much that Fast Flow becomes visually filled with white noise.
+
+# 
+
+# Preserve negative space even at high Flow Strength.
+
+# 
+
+# \---
+
+# 
+
+# \# Stretch Behavior
+
+# 
+
+# Pattern Stretch must progressively increase with Flow Strength.
+
+# 
+
+# Example conceptual behavior:
+
+# 
+
+# FlowStrength 0.00
+
+# → broad shapes
+
+# 
+
+# FlowStrength 0.33
+
+# → slightly elongated
+
+# 
+
+# FlowStrength 0.66
+
+# → clear river streaks
+
+# 
+
+# FlowStrength 1.00
+
+# → long strong streaks
+
+# 
+
+# The exact interpolation is visual, not numerically fixed.
+
+# 
+
+# \---
+
+# 
+
+# \# Pattern Strength Behavior
+
+# 
+
+# Pattern contribution should gradually increase with Flow Strength.
+
+# 
+
+# However:
+
+# 
+
+# Flow Strength = 0
+
+# 
+
+# must not necessarily mean:
+
+# 
+
+# Pattern Strength = 0.
+
+# 
+
+# Calm water should retain subtle animated highlights.
+
+# 
+
+# Use a non-zero minimum pattern contribution if visually beneficial.
+
+# 
+
+# \---
+
+# 
+
+# \# Pattern Scale
+
+# 
+
+# Flow Strength may optionally affect effective Pattern Scale.
+
+# 
+
+# This is allowed if it helps calm water use:
+
+# 
+
+# \- broader;
+
+# \- larger;
+
+# \- less repetitive forms.
+
+# 
+
+# Do not make Pattern Scale variation strong enough to cause obvious popping or swimming.
+
+# 
+
+# \---
+
+# 
+
+# \# Distortion
+
+# 
+
+# If the hybrid pattern uses procedural distortion:
+
+# 
+
+# Calm:
+
+# \- subtle distortion.
+
+# 
+
+# River:
+
+# \- moderate distortion.
+
+# 
+
+# Fast:
+
+# \- enough distortion to prevent mechanical repetition.
+
+# 
+
+# Do not use Flow Strength to create increasingly chaotic distortion.
+
+# 
+
+# Fast water should remain directional.
 
 # 
 
@@ -286,7 +706,7 @@
 
 # 
 
-# Suggested:
+# Suggested object/group:
 
 # 
 
@@ -294,7 +714,7 @@
 
 # 
 
-# Show at least four states:
+# Display four comparable states:
 
 # 
 
@@ -308,19 +728,63 @@
 
 # 
 
-# Possible implementation:
+# Preferred setup:
 
 # 
 
-# \- adjacent surfaces;
+# \- four adjacent surfaces;
 
-# \- separate material instances;
+# \- same camera;
 
-# \- controlled debug comparison.
+# \- same depth environment;
+
+# \- same base colors;
+
+# \- same Flow Direction;
+
+# \- same maximum Flow Speed.
 
 # 
 
-# A spatial Flow Map is not required yet.
+# Only Flow Strength should differ unless another parameter is intentionally linked to Flow Strength by the shader.
+
+# 
+
+# \---
+
+# 
+
+# \# Optional Continuous Test
+
+# 
+
+# If practical, create an additional runtime validation that smoothly animates:
+
+# 
+
+# Flow Strength:
+
+# 0 → 1 → 0
+
+# 
+
+# This is optional.
+
+# 
+
+# Its purpose is to reveal:
+
+# 
+
+# \- popping;
+
+# \- threshold discontinuities;
+
+# \- sudden stretch changes.
+
+# 
+
+# Do not add a permanent gameplay system solely for this test.
 
 # 
 
@@ -336,23 +800,129 @@
 
 # 
 
-# \- animation progressively accelerates;
-
-# \- pattern stretch progressively increases;
-
-# \- pattern strength changes appropriately;
-
-# \- calm water remains visually alive;
-
-# \- fast water feels clearly directional;
-
-# \- intermediate values interpolate smoothly;
-
-# \- depth coloring remains correct.
+# \## Flow Strength 0
 
 # 
 
-# A viewer should be able to identify relative flow strength without reading numeric labels.
+# \- movement remains subtle;
+
+# \- base water dominates;
+
+# \- pattern is broad and sparse;
+
+# \- surface does not look frozen;
+
+# \- surface does not look like a paused river.
+
+# 
+
+# \## Flow Strength 0.33
+
+# 
+
+# \- gentle directional movement is visible;
+
+# \- highlight forms begin elongating;
+
+# \- transition from calm remains coherent.
+
+# 
+
+# \## Flow Strength 0.66
+
+# 
+
+# \- clear river-like current;
+
+# \- medium/high stretch;
+
+# \- readable directional streaks;
+
+# \- clean negative space remains.
+
+# 
+
+# \## Flow Strength 1
+
+# 
+
+# \- strong fast flow;
+
+# \- long directional streaks;
+
+# \- higher pattern prominence;
+
+# \- no loss of readability.
+
+# 
+
+# \---
+
+# 
+
+# \# Cross-State Validation
+
+# 
+
+# Confirm:
+
+# 
+
+# \- speed progressively increases;
+
+# \- Pattern Stretch progressively increases;
+
+# \- pattern contribution changes progressively;
+
+# \- coverage changes coherently;
+
+# \- intermediate values do not pop;
+
+# \- depth coloring remains correct;
+
+# \- Shallow/Deep colors remain correct;
+
+# \- opacity remains functional;
+
+# \- Flow Direction remains functional.
+
+# 
+
+# A viewer should be able to identify the relative flow state without numeric labels.
+
+# 
+
+# \---
+
+# 
+
+# \# Visual Acceptance Target
+
+# 
+
+# The four states should visually communicate:
+
+# 
+
+# Calm
+
+# → Slow
+
+# → River
+
+# → Fast
+
+# 
+
+# even in a still comparison screenshot.
+
+# 
+
+# Motion should reinforce that difference in Play Mode.
+
+# 
+
+# The visual distinction should not depend exclusively on animation speed.
 
 # 
 
@@ -368,11 +938,29 @@
 
 # 
 
-# Use the existing pattern system.
+# Use the existing hybrid pattern and Noise 1 source validated through SPEC-005 and shaped in SPEC-006.
 
 # 
 
-# If Flow Strength reveals that another texture is necessary, stop and report before adding it.
+# Do not create/import:
+
+# 
+
+# \- new noise textures;
+
+# \- masks;
+
+# \- alpha textures;
+
+# \- foam textures;
+
+# \- normal maps;
+
+# \- Flow Maps.
+
+# 
+
+# If SPEC-007 reveals that an additional asset is genuinely required, stop and report before adding it.
 
 # 
 
@@ -388,17 +976,25 @@
 
 # 
 
-# \- Flow Strength provides a convincing continuous visual family;
+# \- \_FlowStrength controls a continuous visual family from calm to fast water;
 
-# \- calm water does not look like paused river water;
+# \- Flow Strength affects speed, stretch, pattern strength, and pattern coverage/threshold;
 
-# \- river and fast-flow states are clearly different;
+# \- Calm water does not look like paused river water;
 
-# \- intermediate states remain visually coherent;
+# \- calm water remains subtly alive;
 
-# \- no hard visual transitions occur;
+# \- River state has clean directional streaks;
 
-# \- existing depth and pattern systems remain functional.
+# \- Fast state has elongated strong directional marks;
+
+# \- negative space remains visible across all states;
+
+# \- no hard transitions or popping occur;
+
+# \- existing depth and color systems remain functional;
+
+# \- no Flow Maps or later features were implemented.
 
 # 
 
@@ -416,13 +1012,19 @@
 
 # \- Flow Maps;
 
-# \- curved flow;
+# \- curved local flow;
 
 # \- foam;
 
+# \- intersection foam;
+
+# \- waterfall foam;
+
+# \- waterfall edge effects;
+
 # \- waves;
 
-# \- normals;
+# \- custom normals;
 
 # \- reflection;
 
