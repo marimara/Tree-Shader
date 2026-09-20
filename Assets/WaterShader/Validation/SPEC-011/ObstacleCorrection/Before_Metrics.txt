@@ -1,0 +1,1 @@
+Before: forward min=0,97156; reverse samples=0; B error=0; traces: 68/80 arrived, 12 collider hits, 0 bank escapes.

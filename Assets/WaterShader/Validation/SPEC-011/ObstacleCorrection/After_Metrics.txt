@@ -1,0 +1,1 @@
+After: forward min=0,39904; reverse samples=0; B error=0; traces: 80/80 arrived, 0 collider hits, 0 bank escapes.

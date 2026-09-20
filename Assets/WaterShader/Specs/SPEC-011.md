@@ -6,11 +6,25 @@
 
 # 
 
-# Extend the Flow Map Baker so scene geometry can influence the generated water flow.
+# Extend the Flow Map Baker created in SPEC-010 so scene geometry and water boundaries can influence the generated flow field.
 
 # 
 
-# The baker should use relevant colliders and/or water boundaries to steer flow around obstacles instead of ignoring them.
+# The centerline/path created in SPEC-010 remains the primary flow backbone.
+
+# 
+
+# Scene geometry should refine that field locally by:
+
+# 
+
+# \- identifying valid water regions;
+
+# \- identifying obstacles;
+
+# \- measuring distance from boundaries;
+
+# \- steering flow around reasonable local obstructions.
 
 # 
 
@@ -18,7 +32,7 @@
 
 # 
 
-# Do not introduce full runtime fluid simulation.
+# Do not introduce runtime fluid simulation.
 
 # 
 
@@ -30,7 +44,29 @@
 
 # 
 
-# Requires completed and validated SPEC-010.
+# Requires completed and validated:
+
+# 
+
+# \- SPEC-010 — Flow Map Baker Tool
+
+# 
+
+# Preserve:
+
+# 
+
+# \- centerline/path authoring;
+
+# \- continuous tangent generation;
+
+# \- Flow Map RG encoding;
+
+# \- Flow Strength B encoding;
+
+# \- SPEC-009 advection;
+
+# \- uniform-flow fallback.
 
 # 
 
@@ -38,57 +74,41 @@
 
 # 
 
-# \# Core Goal
+# \# Core Principle
 
 # 
 
-# Given:
+# The authored centerline remains the main definition of where the river travels.
 
 # 
 
-# \- a water surface;
-
-# \- entry / source;
-
-# \- target / exit;
-
-# \- relevant obstacles;
+# Collider and boundary information modifies the flow field locally.
 
 # 
 
-# the baker should produce a plausible flow field that bends around blocked regions.
+# Conceptually:
 
 # 
 
-# \---
+# Centerline
+
+# → primary direction field
 
 # 
 
-# \# Collider Detection
+# Boundaries / Colliders
+
+# → local constraints and steering
 
 # 
 
-# Allow the baker to consider relevant scene colliders intersecting or influencing the water region.
+# Combined result
+
+# → final baked Flow Map
 
 # 
 
-# Provide a controllable way to choose which colliders participate.
-
-# 
-
-# Preferred options include:
-
-# 
-
-# \- LayerMask;
-
-# \- explicit collider collection;
-
-# \- other clear filtering mechanism.
-
-# 
-
-# Do not automatically treat every scene collider as water geometry.
+# Do not replace the centerline with a general-purpose pathfinding system.
 
 # 
 
@@ -96,11 +116,91 @@
 
 # 
 
-# \# Obstacle Representation
+# \# Scope of Automatic Steering
 
 # 
 
-# Convert detected obstacles into a technical representation suitable for baking.
+# The system should handle reasonable local obstacles such as:
+
+# 
+
+# \- rocks;
+
+# \- pillars;
+
+# \- small terrain intrusions;
+
+# \- simple islands;
+
+# \- local boundary irregularities.
+
+# 
+
+# The system is not required to solve arbitrary maze-like environments.
+
+# 
+
+# If an obstacle completely blocks the authored channel or makes the centerline invalid, the baker should report the problem rather than attempting complex automatic rerouting.
+
+# 
+
+# \---
+
+# 
+
+# \# Collider Filtering
+
+# 
+
+# Allow the baker to explicitly control which colliders influence water flow.
+
+# 
+
+# Preferred mechanism:
+
+# 
+
+# LayerMask
+
+# 
+
+# Optional additional mechanism:
+
+# 
+
+# explicit collider collection.
+
+# 
+
+# Do not automatically include every collider in the scene.
+
+# 
+
+# Provide a clear field such as:
+
+# 
+
+# Obstacle Layers
+
+# 
+
+# or equivalent.
+
+# 
+
+# \---
+
+# 
+
+# \# Water Boundary Source
+
+# 
+
+# The baker must establish which texels represent valid water.
+
+# 
+
+# Support at least one robust boundary source.
 
 # 
 
@@ -108,17 +208,29 @@
 
 # 
 
-# \- occupancy grid;
+# \- water surface mesh footprint;
 
-# \- obstacle mask;
+# \- dedicated water boundary collider;
 
-# \- distance field;
+# \- explicit boundary geometry;
 
-# \- another efficient editor-time representation.
+# \- generated mask from configured water region.
 
 # 
 
-# Choose the simplest robust solution.
+# Choose the simplest solution compatible with the project.
+
+# 
+
+# The resulting internal representation should distinguish:
+
+# 
+
+# Valid Water
+
+# Blocked / Outside Water
+
+# Obstacle
 
 # 
 
@@ -126,23 +238,177 @@
 
 # 
 
-# \# Flow Steering
+# \# Technical Representation
 
 # 
 
-# Generated vectors near obstacles should:
+# Convert boundary and obstacle information into a bake-space representation.
 
 # 
 
-# \- avoid pointing directly through blocked geometry;
-
-# \- bend smoothly around obstacles;
-
-# \- recover toward the overall target direction after passing the obstacle.
+# Possible internal data:
 
 # 
 
-# Avoid abrupt 90-degree vector changes where possible.
+# \- occupancy grid;
+
+# \- water mask;
+
+# \- obstacle mask;
+
+# \- distance field.
+
+# 
+
+# A grid-based Editor-time representation is acceptable.
+
+# 
+
+# Do not expose implementation complexity unless useful for debugging.
+
+# 
+
+# \---
+
+# 
+
+# \# Distance Field
+
+# 
+
+# Generate or approximate distance to the nearest invalid region / obstacle if technically useful.
+
+# 
+
+# This information is expected to become important for:
+
+# 
+
+# \- smooth obstacle steering;
+
+# \- width estimation in SPEC-012;
+
+# \- future intersection foam;
+
+# \- future turbulence.
+
+# 
+
+# For SPEC-011, use it only where needed for routing and diagnostics.
+
+# 
+
+# Do not implement foam or turbulence.
+
+# 
+
+# \---
+
+# 
+
+# \# Relationship to Centerline
+
+# 
+
+# For each valid water sample:
+
+# 
+
+# 1\. determine its closest / relevant position on the centerline;
+
+# 2\. obtain the centerline tangent;
+
+# 3\. evaluate boundary / obstacle influence;
+
+# 4\. modify the local direction only as much as required;
+
+# 5\. smoothly return toward the centerline direction after the influence ends.
+
+# 
+
+# The centerline tangent should remain the dominant long-range direction.
+
+# 
+
+# \---
+
+# 
+
+# \# Obstacle Steering
+
+# 
+
+# Near an obstacle, flow should:
+
+# 
+
+# \- avoid pointing directly into blocked space;
+
+# \- move around the obstacle using a smooth lateral component;
+
+# \- preserve forward progression;
+
+# \- gradually recover toward the centerline tangent afterward.
+
+# 
+
+# Avoid:
+
+# 
+
+# \- sudden 90-degree turns;
+
+# \- vectors pointing backward without a strong reason;
+
+# \- circular flow around static obstacles;
+
+# \- high-frequency direction changes.
+
+# 
+
+# \---
+
+# 
+
+# \# Forward Progress Requirement
+
+# 
+
+# Obstacle avoidance must preserve meaningful downstream motion.
+
+# 
+
+# A local obstacle should not accidentally produce:
+
+# 
+
+# \- loops;
+
+# \- backwards flow;
+
+# \- spirals;
+
+# \- stagnant regions;
+
+# 
+
+# unless such behavior is explicitly authored in a future system.
+
+# 
+
+# Prefer a combination of:
+
+# 
+
+# forward tangent
+
+# \+
+
+# obstacle avoidance influence
+
+# 
+
+# rather than replacing the forward direction completely.
 
 # 
 
@@ -154,15 +420,19 @@
 
 # 
 
-# Where water boundaries can be identified, flow should preferentially remain inside the valid water region.
+# Flow near the edge of the water region should remain inside valid water.
 
 # 
 
-# Do not require physically accurate wall interaction.
+# Vectors should not point strongly out of the water mask.
 
 # 
 
-# The goal is visually plausible steering.
+# Use boundary influence to gently steer the field inward where necessary.
+
+# 
+
+# Do not create an obvious artificial "wall-following" effect.
 
 # 
 
@@ -170,29 +440,61 @@
 
 # 
 
-# \# Distance-from-Obstacle Data
+# \# Smoothness
 
 # 
 
-# If useful, compute a distance field or approximate distance-to-obstacle measure.
+# The resulting direction field must remain compatible with the visual requirements discovered in SPEC-009.
 
 # 
 
-# This may be used for:
+# Neighboring vectors should change smoothly.
 
 # 
 
-# \- smooth steering;
-
-# \- future foam;
-
-# \- future turbulence;
-
-# \- future speed adjustments.
+# Avoid producing data that requires expensive shader-side blur or correction.
 
 # 
 
-# Do not implement those future visual systems yet.
+# If the baked map produces visually incorrect curves:
+
+# 
+
+# debug the bake data first.
+
+# 
+
+# Do not immediately modify the validated runtime shader.
+
+# 
+
+# \---
+
+# 
+
+# \# Centerline Validity
+
+# 
+
+# Provide validation for the authored centerline.
+
+# 
+
+# Warn if:
+
+# 
+
+# \- the centerline leaves the valid water region;
+
+# \- a control point lies inside a blocking collider;
+
+# \- a large obstacle completely blocks the intended path;
+
+# \- the channel becomes too narrow for reliable bake resolution.
+
+# 
+
+# Do not silently generate obviously invalid data.
 
 # 
 
@@ -204,15 +506,15 @@
 
 # 
 
-# The user should be able to choose an appropriate bake resolution.
+# Reuse the resolution controls created in SPEC-010.
 
 # 
 
-# Avoid hard-coding extremely high resolutions.
+# Obstacle and boundary sampling should use the same predictable bake-space mapping.
 
 # 
 
-# The tool should remain practical for Editor iteration.
+# Do not create an unrelated secondary resolution unless technically necessary.
 
 # 
 
@@ -224,55 +526,29 @@
 
 # 
 
-# Provide visualization for:
+# Provide useful diagnostics for:
 
 # 
 
-# \- obstacle cells;
+# \- valid water mask;
 
-# \- valid water cells;
+# \- obstacles;
 
-# \- flow direction;
+# \- distance-to-boundary / obstacle if implemented;
 
-# \- optional distance field.
+# \- centerline;
 
-# 
+# \- final local direction;
 
-# Debug displays should make bake problems understandable.
-
-# 
-
-# \---
+# \- blocked cells.
 
 # 
 
-# \# Validation Scene
+# The user should be able to understand why a region received a particular flow direction.
 
 # 
 
-# Create a simple technical setup with:
-
-# 
-
-# \- water surface;
-
-# \- source;
-
-# \- exit;
-
-# \- one or more collider obstacles.
-
-# 
-
-# Validate that flow visibly routes around obstacles.
-
-# 
-
-# Use simple primitives.
-
-# 
-
-# Do not create decorative scenery.
+# Avoid rendering excessive Scene View gizmos by default.
 
 # 
 
@@ -280,7 +556,19 @@
 
 # 
 
-# \# Validation
+# \# Validation Case A — Boundary Following
+
+# 
+
+# Create a technical water channel containing:
+
+# 
+
+# \- a clear centerline;
+
+# \- curved boundaries;
+
+# \- no internal obstacle.
 
 # 
 
@@ -288,19 +576,11 @@
 
 # 
 
-# \- collider filtering works;
+# \- flow remains inside the channel;
 
-# \- obstacles affect the generated field;
+# \- flow broadly follows the centerline;
 
-# \- vectors do not intentionally pass through blocked cells;
-
-# \- flow bends around obstacles;
-
-# \- output remains smooth enough for SPEC-009 advection;
-
-# \- rebaking after moving an obstacle changes the generated field;
-
-# \- shader responds to the updated bake.
+# \- boundary influence does not create unnecessary distortion.
 
 # 
 
@@ -308,15 +588,195 @@
 
 # 
 
-# \# External Assets
+# \# Validation Case B — Local Obstacle
 
 # 
 
-# No new textures should be manually authored.
+# Add a simple obstacle such as a rock/cylinder/cube that partially obstructs the channel.
 
 # 
 
-# Bake data must be generated by the tool.
+# Bake again.
+
+# 
+
+# Expected:
+
+# 
+
+# before obstacle:
+
+# → follows centerline
+
+# 
+
+# near obstacle:
+
+# → smoothly diverts
+
+# 
+
+# after obstacle:
+
+# → returns toward centerline
+
+# 
+
+# The resulting shader motion must remain visually clean.
+
+# 
+
+# \---
+
+# 
+
+# \# Validation Case C — Moved Obstacle
+
+# 
+
+# Move the obstacle.
+
+# 
+
+# Rebake.
+
+# 
+
+# Confirm that:
+
+# 
+
+# \- affected vectors change;
+
+# \- unaffected areas remain largely stable;
+
+# \- shader responds to the new map;
+
+# \- generated field still follows the channel.
+
+# 
+
+# \---
+
+# 
+
+# \# Flow Strength
+
+# 
+
+# SPEC-011 should avoid introducing complex automatic strength behavior.
+
+# 
+
+# Prefer constant or authored strength from SPEC-010 during direction validation.
+
+# 
+
+# Obstacle steering must not unintentionally create large Flow Strength changes.
+
+# 
+
+# Automatic width / constriction-driven Flow Strength belongs to SPEC-012.
+
+# 
+
+# \---
+
+# 
+
+# \# Critical Separation of Responsibilities
+
+# 
+
+# RG:
+
+# 
+
+# Flow Direction
+
+# 
+
+# B:
+
+# 
+
+# Flow Strength
+
+# 
+
+# Obstacle steering should primarily affect RG.
+
+# 
+
+# Do not encode directional correction by manipulating B.
+
+# 
+
+# Do not let local obstacle distance arbitrarily change Pattern Stretch through unintended strength changes.
+
+# 
+
+# \---
+
+# 
+
+# \# Generated Data
+
+# 
+
+# Continue generating persistent Flow Maps through the SPEC-010 baker.
+
+# 
+
+# No manually authored texture is required.
+
+# 
+
+# Generated assets remain under:
+
+# 
+
+# Assets/WaterShader/Generated/
+
+# 
+
+# \---
+
+# 
+
+# \# Performance
+
+# 
+
+# This remains an Editor-time operation.
+
+# 
+
+# It is acceptable to perform:
+
+# 
+
+# \- grid analysis;
+
+# \- distance calculations;
+
+# \- iterative smoothing;
+
+# 
+
+# during Bake.
+
+# 
+
+# Prioritize field quality over extremely fast bake time.
+
+# 
+
+# However, keep iteration practical for normal level design.
+
+# 
+
+# Do not perform this analysis continuously every frame.
 
 # 
 
@@ -332,13 +792,23 @@
 
 # 
 
-# \- scene colliders can influence a baked Flow Map;
+# \- water boundaries are represented in bake space;
 
-# \- flow routes around obstacles;
+# \- relevant colliders can be selected/filterable;
 
-# \- moving an obstacle and rebaking updates the route;
+# \- generated flow remains inside valid water;
 
-# \- generated fields remain usable by the stylized shader;
+# \- simple obstacles influence the baked field;
+
+# \- flow smoothly moves around local obstacles;
+
+# \- forward progression is preserved;
+
+# \- flow returns toward the centerline after obstacles;
+
+# \- moving an obstacle and rebaking changes the expected area;
+
+# \- resulting maps remain visually compatible with SPEC-009;
 
 # \- no runtime fluid simulation is introduced.
 
@@ -356,15 +826,29 @@
 
 # 
 
-# \- automatic river-to-lake strength logic;
+# \- full automatic route planning;
 
-# \- full NavMesh-style complex authoring;
+# \- NavMesh-style river routing;
+
+# \- arbitrary maze solving;
 
 # \- runtime collider recalculation;
 
-# \- shallow-water simulation;
+# \- automatic width-to-strength generation;
+
+# \- automatic lake detection;
 
 # \- foam;
 
-# \- VFX.
+# \- waves;
+
+# \- normals;
+
+# \- reflection;
+
+# \- refraction;
+
+# \- VFX;
+
+# \- runtime fluid simulation.
 

@@ -6,11 +6,11 @@
 
 # 
 
-# Automatically generate Flow Strength values during the Flow Map bake so narrow directional water can transition naturally into broad calm water.
+# Automatically generate Flow Strength during the Flow Map bake so a narrow directional river can transition naturally into slower broad water and eventually a calm lake-like region.
 
 # 
 
-# The baker should produce a useful:
+# The system should produce:
 
 # 
 
@@ -20,11 +20,29 @@
 
 # → Slow Water
 
-# → Calm Lake
+# → Calm Water
 
 # 
 
-# transition without manually painting Flow Strength.
+# without requiring manual per-pixel Flow Strength painting.
+
+# 
+
+# The result does not need to be physically accurate.
+
+# 
+
+# It must be:
+
+# 
+
+# \- visually plausible;
+
+# \- stable;
+
+# \- smooth;
+
+# \- artist-controllable.
 
 # 
 
@@ -40,9 +58,9 @@
 
 # 
 
-# \- SPEC-010
+# \- SPEC-010 — Flow Map Baker
 
-# \- SPEC-011
+# \- SPEC-011 — Collider and Boundary-aware Bake
 
 # 
 
@@ -50,11 +68,15 @@
 
 # 
 
-# \- Flow Map direction;
+# \- centerline-based direction;
 
-# \- collider-aware steering;
+# \- boundary representation;
 
-# \- shader Flow Strength behavior from SPEC-007.
+# \- collider steering;
+
+# \- SPEC-007 Flow Strength visual behavior;
+
+# \- SPEC-009 advection.
 
 # 
 
@@ -66,53 +88,23 @@
 
 # 
 
-# Flow Strength should be derived from scene/bake information.
+# Flow Strength B should be generated primarily as a function of progression along the water path.
 
 # 
 
-# Do not require manual per-pixel strength painting.
+# Environmental measurements such as channel width may influence this longitudinal profile.
 
 # 
 
-# The system does not need to be physically correct.
+# Avoid uncontrolled per-pixel variation across the width of the river.
 
 # 
 
-# It should be visually plausible and artist-controllable.
+# This is critical.
 
 # 
 
-# \---
-
-# 
-
-# \# Candidate Strength Inputs
-
-# 
-
-# Flow Strength may consider:
-
-# 
-
-# \- local available width;
-
-# \- distance to boundaries;
-
-# \- distance to obstacles;
-
-# \- path constriction;
-
-# \- proximity to source;
-
-# \- proximity to target;
-
-# \- user-defined global strength;
-
-# \- optional manually defined calm/fast zones.
-
-# 
-
-# Use only the inputs that materially improve the result.
+# SPEC-009 testing demonstrated that transverse per-pixel variation can visually tilt or distort streaks even when Flow Direction RG is correct.
 
 # 
 
@@ -120,15 +112,349 @@
 
 # 
 
-# \# Width-based Behavior
+# \# Separation of Direction and Strength
 
 # 
 
-# Narrow passages should generally allow stronger Flow Strength.
+# RG defines:
 
 # 
 
-# Broad open regions should generally allow lower Flow Strength.
+# where the water travels.
+
+# 
+
+# B defines:
+
+# 
+
+# how strong the visual flow is.
+
+# 
+
+# Changing B must not modify:
+
+# 
+
+# \- local tangent;
+
+# \- pattern coordinate frame;
+
+# \- transverse orientation;
+
+# \- centerline direction.
+
+# 
+
+# Flow Strength must feed only the existing SPEC-007 behavior.
+
+# 
+
+# \---
+
+# 
+
+# \# Width Measurement
+
+# 
+
+# Use the valid-water representation from SPEC-011 to estimate available channel width.
+
+# 
+
+# Preferred conceptual method:
+
+# 
+
+# centerline sample
+
+# → determine local perpendicular direction
+
+# → measure distance to each water boundary
+
+# → combine both distances
+
+# → local channel width
+
+# 
+
+# Exact implementation may vary.
+
+# 
+
+# Do not estimate width simply from arbitrary pixel density or world-axis dimensions.
+
+# 
+
+# Width should relate to the local path orientation.
+
+# 
+
+# \---
+
+# 
+
+# \# Centerline Width Profile
+
+# 
+
+# Evaluate width along the centerline at multiple samples.
+
+# 
+
+# Produce a longitudinal profile:
+
+# 
+
+# Path Parameter
+
+# → Local Width
+
+# 
+
+# Example:
+
+# 
+
+# 0.00 → 3.0 m
+
+# 0.25 → 3.3 m
+
+# 0.50 → 3.1 m
+
+# 0.70 → 5.5 m
+
+# 0.85 → 10.0 m
+
+# 1.00 → 18.0 m
+
+# 
+
+# This profile becomes an input for strength generation.
+
+# 
+
+# \---
+
+# 
+
+# \# Width-to-Strength Heuristic
+
+# 
+
+# Default artistic behavior:
+
+# 
+
+# narrower channel
+
+# → stronger Flow Strength
+
+# 
+
+# broader channel
+
+# → weaker Flow Strength
+
+# 
+
+# This is a stylized heuristic.
+
+# 
+
+# Do not claim physical fluid accuracy.
+
+# 
+
+# The mapping must be tunable.
+
+# 
+
+# \---
+
+# 
+
+# \# Strength Range
+
+# 
+
+# Expose a controllable output range.
+
+# 
+
+# Suggested:
+
+# 
+
+# Minimum Flow Strength
+
+# Maximum Flow Strength
+
+# 
+
+# Generated strength must be mapped into this range.
+
+# 
+
+# Do not assume:
+
+# 
+
+# B = 0
+
+# means absolutely motionless.
+
+# 
+
+# Do not assume:
+
+# 
+
+# B = 1
+
+# means maximum possible shader motion.
+
+# 
+
+# The artist controls the useful visual range.
+
+# 
+
+# \---
+
+# 
+
+# \# Width Influence
+
+# 
+
+# Expose a control equivalent to:
+
+# 
+
+# Width Influence
+
+# 
+
+# At:
+
+# 
+
+# 0
+
+# 
+
+# channel width does not alter Flow Strength.
+
+# 
+
+# At:
+
+# 
+
+# 1
+
+# 
+
+# width strongly influences the generated profile.
+
+# 
+
+# Exact implementation may differ.
+
+# 
+
+# \---
+
+# 
+
+# \# Strength Smoothing
+
+# 
+
+# Raw width measurements may fluctuate because of:
+
+# 
+
+# \- collider edges;
+
+# \- irregular terrain;
+
+# \- grid sampling;
+
+# \- small boundary details.
+
+# 
+
+# Do not translate those fluctuations directly into Flow Strength.
+
+# 
+
+# Apply longitudinal smoothing.
+
+# 
+
+# Possible methods:
+
+# 
+
+# \- moving average;
+
+# \- Gaussian-like smoothing;
+
+# \- curve smoothing;
+
+# \- another lightweight Editor-time approach.
+
+# 
+
+# The final B profile should vary gradually unless an abrupt transition is intentionally configured.
+
+# 
+
+# \---
+
+# 
+
+# \# Small Geometry Rejection
+
+# 
+
+# Very small rocks or boundary details should not automatically create dramatic speed changes.
+
+# 
+
+# Provide a mechanism or smoothing behavior that prevents tiny local width differences from producing:
+
+# 
+
+# fast
+
+# slow
+
+# fast
+
+# slow
+
+# 
+
+# over short distances.
+
+# 
+
+# The system should respond primarily to meaningful channel-scale changes.
+
+# 
+
+# \---
+
+# 
+
+# \# Cross-section Strength Consistency
+
+# 
+
+# For a given centerline parameter, Flow Strength should generally remain similar across the local cross-section.
 
 # 
 
@@ -136,19 +462,27 @@
 
 # 
 
-# narrow channel
-
-# → stronger / faster flow
+# Left Bank    Center    Right Bank
 
 # 
 
-# broad basin
-
-# → weaker / calmer flow
+# 0.65         0.65      0.65
 
 # 
 
-# This should be tunable rather than physically rigid.
+# rather than:
+
+# 
+
+# 0.30         0.80      0.45
+
+# 
+
+# unless a future specialized system intentionally requires that behavior.
+
+# 
+
+# This protects pattern orientation and visual coherence.
 
 # 
 
@@ -156,27 +490,101 @@
 
 # 
 
-# \# River-to-Lake Transition
+# \# Propagating Strength to the Flow Map
 
 # 
 
-# Create a technical test where:
+# For each valid Flow Map texel:
 
 # 
 
-# \- water enters through a narrower river region;
+# 1\. determine its related centerline parameter;
 
-# \- follows a path;
+# 2\. evaluate the smoothed strength profile at that parameter;
 
-# \- opens into a significantly broader basin.
-
-# 
-
-# The generated B channel should gradually decrease as the water enters the broad area.
+# 3\. encode that value into B.
 
 # 
 
-# Avoid abrupt transitions.
+# This should create broad coherent strength bands following river progression.
+
+# 
+
+# \---
+
+# 
+
+# \# River-to-Lake Detection
+
+# 
+
+# A lake-like transition may be inferred when width increases substantially and remains broad for a meaningful distance.
+
+# 
+
+# Do not treat every temporary widening as a lake.
+
+# 
+
+# Possible signals:
+
+# 
+
+# \- sustained width increase;
+
+# \- large width relative to previous river sections;
+
+# \- configurable broad-water threshold.
+
+# 
+
+# Keep detection heuristic and artist-controllable.
+
+# 
+
+# \---
+
+# 
+
+# \# Gradual Transition
+
+# 
+
+# When river width opens into a broad basin:
+
+# 
+
+# do not immediately jump:
+
+# 
+
+# 0.8 → 0.2
+
+# 
+
+# Use a configurable transition/falloff.
+
+# 
+
+# Target:
+
+# 
+
+# 0.8
+
+# → 0.72
+
+# → 0.60
+
+# → 0.45
+
+# → 0.30
+
+# → 0.20
+
+# 
+
+# Exact values depend on artist settings.
 
 # 
 
@@ -188,59 +596,43 @@
 
 # 
 
-# Expose a small number of useful controls.
+# Keep controls compact.
 
 # 
 
-# Possible examples:
+# Recommended:
 
 # 
 
-# Minimum Flow Strength  
+# Minimum Flow Strength
 
-# Maximum Flow Strength  
+# 
 
-# Width Influence  
+# Maximum Flow Strength
 
-# Strength Falloff  
+# 
+
+# Width Influence
+
+# 
+
+# Strength Smoothing
+
+# 
 
 # Calm Bias
 
 # 
 
-# Exact names may vary.
+# Optional:
 
 # 
 
-# Avoid excessive parameters.
+# Lake Width Threshold
 
 # 
 
-# \---
-
-# 
-
-# \# Optional Override
-
-# 
-
-# A lightweight override mechanism is allowed for cases where automatic generation is visually insufficient.
-
-# 
-
-# For example:
-
-# 
-
-# \- calm zone;
-
-# \- strength multiplier region;
-
-# \- source strength override.
-
-# 
-
-# Do not turn this Spec into a full node-based authoring system.
+# Avoid exposing large numbers of low-level mathematical parameters.
 
 # 
 
@@ -248,29 +640,253 @@
 
 # 
 
-# \# Shader Integration
+# \# Manual Strength Profile
 
 # 
 
-# Generated Flow Strength must continue using the existing SPEC-007 shader logic.
+# Preserve the useful SPEC-010 ability to test:
 
 # 
 
-# Do not create a new calm-water implementation.
+# \- Constant Strength;
+
+# \- authored Strength Falloff.
 
 # 
 
-# The purpose is for generated B values to automatically drive:
+# Automatic generation should be an additional mode.
 
 # 
 
-# \- speed;
+# Suggested modes:
 
-# \- stretch;
+# 
 
-# \- highlight intensity;
+# Constant
 
-# \- pattern coverage.
+# Manual/Profile
+
+# Automatic Width
+
+# 
+
+# or equivalent.
+
+# 
+
+# This allows debugging and art direction.
+
+# 
+
+# \---
+
+# 
+
+# \# Optional Override Zones
+
+# 
+
+# A lightweight override mechanism is allowed but not required for initial completion.
+
+# 
+
+# Possible future-friendly overrides:
+
+# 
+
+# Calm Zone
+
+# Fast Zone
+
+# Strength Multiplier
+
+# 
+
+# If implementation becomes large, defer override zones to a separate Spec.
+
+# 
+
+# Do not turn SPEC-012 into a node graph.
+
+# 
+
+# \---
+
+# 
+
+# \# River-to-Lake Validation Scene
+
+# 
+
+# Construct or extend a technical scene containing:
+
+# 
+
+# \- narrow upstream channel;
+
+# \- curved river section;
+
+# \- widening downstream section;
+
+# \- broad final basin.
+
+# 
+
+# The geometry should make the intended behavior obvious.
+
+# 
+
+# \---
+
+# 
+
+# \# Validation A — Direction Isolation
+
+# 
+
+# First verify the generated RG field with constant strength.
+
+# 
+
+# Confirm direction remains correct.
+
+# 
+
+# Do not diagnose direction and strength simultaneously.
+
+# 
+
+# \---
+
+# 
+
+# \# Validation B — Automatic Strength
+
+# 
+
+# Enable automatic width-based strength.
+
+# 
+
+# Expected:
+
+# 
+
+# narrow region
+
+# → stronger flow
+
+# 
+
+# normal river
+
+# → medium flow
+
+# 
+
+# widening region
+
+# → progressively slower
+
+# 
+
+# broad basin
+
+# → calm-like flow
+
+# 
+
+# \---
+
+# 
+
+# \# Validation C — Geometry Change
+
+# 
+
+# Modify the river geometry.
+
+# 
+
+# Examples:
+
+# 
+
+# \- make a narrow section wider;
+
+# \- enlarge the basin;
+
+# \- move a boundary.
+
+# 
+
+# Rebake.
+
+# 
+
+# Confirm Flow Strength responds predictably.
+
+# 
+
+# \---
+
+# 
+
+# \# Visual Validation
+
+# 
+
+# The water shader should visibly change through the existing SPEC-007 system:
+
+# 
+
+# stronger B
+
+# → faster animation
+
+# → longer stretch
+
+# → stronger directional read
+
+# 
+
+# weaker B
+
+# → slower animation
+
+# → broader / calmer shapes
+
+# → reduced pattern prominence
+
+# 
+
+# Do not implement a separate calm-water shader.
+
+# 
+
+# \---
+
+# 
+
+# \# No Transverse Distortion
+
+# 
+
+# Specifically verify that lowering Flow Strength does not cause:
+
+# 
+
+# \- streaks to tilt sideways;
+
+# \- local orientation changes unrelated to RG;
+
+# \- sudden transverse scaling;
+
+# \- pattern deformation.
+
+# 
+
+# This was a previously observed failure mode and must remain fixed.
 
 # 
 
@@ -282,51 +898,23 @@
 
 # 
 
-# Provide clear Flow Strength visualization during bake validation.
+# Provide useful inspection for:
 
 # 
 
-# The user should be able to inspect:
+# \- measured centerline width;
+
+# \- raw width profile;
+
+# \- smoothed width profile;
+
+# \- generated Flow Strength profile;
+
+# \- final B texture/channel.
 
 # 
 
-# fast → medium → slow → calm
-
-# 
-
-# directly.
-
-# 
-
-# \---
-
-# 
-
-# \# Validation
-
-# 
-
-# Create a technical river-to-lake setup.
-
-# 
-
-# Confirm:
-
-# 
-
-# \- narrow region has stronger Flow Strength;
-
-# \- open region has lower Flow Strength;
-
-# \- transition is smooth;
-
-# \- shader visibly transitions from directional river to calmer water;
-
-# \- collider-aware direction still works;
-
-# \- rebaking after changing geometry updates strength;
-
-# \- no manual Flow Map painting is required.
+# The developer should be able to determine why a section became faster or slower.
 
 # 
 
@@ -338,11 +926,31 @@
 
 # 
 
-# No external texture is required.
+# No external assets are required.
 
 # 
 
-# All strength data should be generated by the baker.
+# All strength information is generated by the baker.
+
+# 
+
+# \---
+
+# 
+
+# \# Performance
+
+# 
+
+# All analysis occurs during Editor bake.
+
+# 
+
+# Runtime continues to consume only the generated Flow Map.
+
+# 
+
+# Do not introduce runtime width detection or geometry analysis.
 
 # 
 
@@ -358,17 +966,27 @@
 
 # 
 
-# \- Flow Strength is generated automatically;
+# \- local channel width can be estimated along the centerline;
 
-# \- narrow channels and broad basins produce meaningfully different strengths;
+# \- raw width measurements are converted into a smooth longitudinal profile;
 
-# \- a river-to-lake transition is clearly visible;
+# \- narrow sections generate higher Flow Strength;
 
-# \- the transition remains smooth;
+# \- sustained broad sections generate lower Flow Strength;
 
-# \- generated strength drives the existing SPEC-007 visual system;
+# \- strength remains coherent across each river cross-section;
 
-# \- no runtime fluid simulation is required.
+# \- river-to-lake transition is gradual;
+
+# \- changing geometry and rebaking updates strength;
+
+# \- B continues driving the existing SPEC-007 behavior;
+
+# \- RG direction remains unchanged by strength generation;
+
+# \- no manual per-pixel painting is required;
+
+# \- no runtime fluid simulation is introduced.
 
 # 
 
@@ -384,11 +1002,17 @@
 
 # 
 
-# \- physical fluid pressure simulation;
+# \- physically accurate fluid conservation;
 
-# \- runtime Navier-Stokes / shallow-water simulation;
+# \- pressure solving;
 
-# \- dynamic collider rebaking every frame;
+# \- Navier-Stokes;
+
+# \- shallow-water simulation;
+
+# \- runtime geometry analysis;
+
+# \- runtime rebaking every frame;
 
 # \- foam;
 
