@@ -11,10 +11,50 @@ namespace Meganeura.Water.Editor
     [CustomEditor(typeof(StylizedWaterFlowBaker))]
     public sealed class StylizedWaterFlowBakerEditor : UnityEditor.Editor
     {
+        bool showQuickSetupOptions;
+
         public override void OnInspectorGUI()
         {
-            DrawDefaultInspector();
             var baker = (StylizedWaterFlowBaker)target;
+            EditorGUILayout.LabelField("Quick Setup", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox("Auto Setup reads the Source Mesh and replaces only the enabled Quick Setup values. It does not Bake. The complete operation supports Undo.", MessageType.None);
+            showQuickSetupOptions = EditorGUILayout.Foldout(showQuickSetupOptions, "Setup Options", true);
+            if (showQuickSetupOptions)
+            {
+                serializedObject.Update();
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("autoFitBakeBounds"), new GUIContent("Fit Bake Bounds"));
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("autoExtractBoundary"), new GUIContent("Extract Boundary"));
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("autoGenerateCenterline"), new GUIContent("Generate Centerline"));
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("autoChooseResolution"), new GUIContent("Choose Resolution"));
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("autoEstimateFlowCoordinates"), new GUIContent("Estimate Flow Coordinates"));
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("autoEstimateSteeringDistance"), new GUIContent("Estimate Steering Distance"));
+                serializedObject.ApplyModifiedProperties();
+            }
+            using (new EditorGUI.DisabledScope(EditorApplication.isPlaying))
+            {
+                if (GUILayout.Button("Auto Setup From Mesh", GUILayout.Height(32f)))
+                {
+                    try { WaterMeshAutoSetup.Run(baker); }
+                    catch (Exception exception) { Debug.LogException(exception, baker); }
+                }
+                using (new EditorGUI.DisabledScope(baker.ControlPoints.Count < 2))
+                {
+                    if (GUILayout.Button("Reverse Flow Direction"))
+                    {
+                        Undo.RecordObject(baker, "Reverse Water Flow Direction");
+                        baker.ReverseFlowDirection();
+                        EditorUtility.SetDirty(baker);
+                        EditorSceneManager.MarkSceneDirty(baker.gameObject.scene);
+                        SceneView.RepaintAll();
+                    }
+                }
+            }
+            if (!string.IsNullOrEmpty(baker.LastAutoSetupSummary))
+                EditorGUILayout.HelpBox(baker.LastAutoSetupSummary, baker.LastAutoSetupHadWarnings ? MessageType.Warning : MessageType.Info);
+
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Manual Baker Settings", EditorStyles.boldLabel);
+            DrawDefaultInspector();
             EditorGUILayout.Space();
             using (new EditorGUI.DisabledScope(EditorApplication.isPlaying))
             {
@@ -251,7 +291,16 @@ namespace Meganeura.Water.Editor
 
             EnsureFolder("Assets/WaterShader/Generated/Meshes");
             string meshPath = $"Assets/WaterShader/Generated/Meshes/MESH_FlowCoordinates_{SanitizeName(baker.gameObject.name)}.asset";
-            Mesh working = UnityEngine.Object.Instantiate(filter.sharedMesh);
+            Mesh source = baker.SourceMesh;
+            if (source == null || source == baker.GeneratedFlowMesh)
+            {
+                source = filter.sharedMesh;
+                if (source == baker.GeneratedFlowMesh)
+                    Debug.LogWarning("[Water Flow Baker] Source Mesh is not assigned; this legacy setup is rebuilding from its generated mesh. Run Auto Setup with the original mesh assigned to migrate safely.", baker);
+                else
+                    baker.SourceMesh = source;
+            }
+            Mesh working = UnityEngine.Object.Instantiate(source);
             if (obstacleCoordinates != null) WaterObstacleContours.RefineMesh(working, baker, obstacles, size);
             working.name = Path.GetFileNameWithoutExtension(meshPath);
             Vector3[] vertices = working.vertices;
@@ -384,7 +433,7 @@ namespace Meganeura.Water.Editor
             int mask = baker.ObstacleLayers.value;
             if (mask != 0)
             {
-                foreach (Collider collider in UnityEngine.Object.FindObjectsByType<Collider>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+                foreach (Collider collider in UnityEngine.Object.FindObjectsByType<Collider>(FindObjectsInactive.Exclude))
                     if (((1 << collider.gameObject.layer) & mask) != 0 && collider.enabled && !result.Contains(collider)) result.Add(collider);
             }
             return result.ToArray();

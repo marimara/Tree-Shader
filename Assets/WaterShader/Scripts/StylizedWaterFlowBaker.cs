@@ -14,7 +14,17 @@ namespace Meganeura.Water
         [Header("Target")]
         [SerializeField] Renderer targetRenderer;
         [SerializeField] Material targetMaterial;
+        [SerializeField, Tooltip("Original authoring mesh. Auto Setup stores this before generated flow-coordinate meshes are assigned.")]
+        Mesh sourceMesh;
         [SerializeField] string outputName = "T_FlowMap_Water";
+
+        [Header("Quick Setup Options")]
+        [SerializeField, HideInInspector] bool autoFitBakeBounds = true;
+        [SerializeField, HideInInspector] bool autoExtractBoundary = true;
+        [SerializeField, HideInInspector] bool autoGenerateCenterline = true;
+        [SerializeField, HideInInspector] bool autoChooseResolution = true;
+        [SerializeField, HideInInspector] bool autoEstimateFlowCoordinates = true;
+        [SerializeField, HideInInspector] bool autoEstimateSteeringDistance = true;
 
         [Header("Bake Region (local XZ)")]
         [SerializeField] Vector2 bakeCenter;
@@ -59,10 +69,19 @@ namespace Meganeura.Water
         [SerializeField, HideInInspector] Texture2D bakeDiagnostics;
         [SerializeField, HideInInspector] Mesh generatedFlowMesh;
         [SerializeField, HideInInspector] string lastBakeSummary;
+        [SerializeField, HideInInspector] string lastAutoSetupSummary;
+        [SerializeField, HideInInspector] bool lastAutoSetupHadWarnings;
 
         public Renderer TargetRenderer { get => targetRenderer; set => targetRenderer = value; }
         public Material TargetMaterial { get => targetMaterial; set => targetMaterial = value; }
+        public Mesh SourceMesh { get => sourceMesh; set => sourceMesh = value; }
         public string OutputName { get => outputName; set => outputName = value; }
+        public bool AutoFitBakeBounds => autoFitBakeBounds;
+        public bool AutoExtractBoundary => autoExtractBoundary;
+        public bool AutoGenerateCenterline => autoGenerateCenterline;
+        public bool AutoChooseResolution => autoChooseResolution;
+        public bool AutoEstimateFlowCoordinates => autoEstimateFlowCoordinates;
+        public bool AutoEstimateSteeringDistance => autoEstimateSteeringDistance;
         public Vector2 BakeCenter { get => bakeCenter; set => bakeCenter = value; }
         public Vector2 BakeSize { get => bakeSize; set => bakeSize = value; }
         public BakeResolution Resolution { get => resolution; set => resolution = value; }
@@ -85,6 +104,8 @@ namespace Meganeura.Water
         public Texture2D BakeDiagnostics => bakeDiagnostics;
         public Mesh GeneratedFlowMesh => generatedFlowMesh;
         public string LastBakeSummary => lastBakeSummary;
+        public string LastAutoSetupSummary => lastAutoSetupSummary;
+        public bool LastAutoSetupHadWarnings => lastAutoSetupHadWarnings;
         public bool ShowPath => showPath;
         public bool ShowBounds => showBounds;
         public bool ShowBoundary => showBoundary;
@@ -176,6 +197,17 @@ namespace Meganeura.Water
         public void SetBakeDiagnostics(Texture2D texture)
         {
             bakeDiagnostics = texture;
+        }
+
+        public void SetAutoSetupResult(string summary, bool hadWarnings)
+        {
+            lastAutoSetupSummary = summary;
+            lastAutoSetupHadWarnings = hadWarnings;
+        }
+
+        public void ReverseFlowDirection()
+        {
+            controlPoints.Reverse();
         }
 
         static Vector3 CatmullRom(Vector3 a, Vector3 b, Vector3 c, Vector3 d, float t)
