@@ -13,6 +13,7 @@ Material:
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
   m_InvalidKeywords:
+  - _USEFLOWCOORDINATES_ON
   - _USEFLOWMAP_ON
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -48,13 +49,15 @@ Material:
     - _NoiseStretch: 2.5
     - _Opacity: 0.72
     - _PatternIntensity: 0.55
-    - _PatternScale: 2.61
+    - _PatternScale: 1.65
     - _PatternSoftness: 0.085
     - _PatternSourceMode: 3
     - _PatternStrength: 0.72
-    - _PatternStretch: 4.9
-    - _PatternThreshold: 0.4
-    - _UseFlowCoordinates: 0
+    - _PatternStretch: 7
+    - _PatternThreshold: 0.5
+    - _PrimaryMarkWidth: 4
+    - _SecondaryMarkStrength: 0.24
+    - _UseFlowCoordinates: 1
     - _UseFlowMap: 1
     m_Colors:
     - _DeepColor: {r: 0, g: 0.38, b: 0.72, a: 1}

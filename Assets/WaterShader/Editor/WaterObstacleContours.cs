@@ -30,8 +30,10 @@ namespace Meganeura.Water.Editor
         {
             if (mesh.subMeshCount != 1)
                 throw new InvalidOperationException("Obstacle-compatible chart generation currently requires a single-submesh water surface.");
-            float coarse = Mathf.Max(baker.BakeSize.x, baker.BakeSize.y) / 100f;
-            float fine = Mathf.Max(.025f, Mathf.Min(baker.BakeSize.x, baker.BakeSize.y) / size);
+            float physicalX = baker.transform.TransformVector(new Vector3(baker.BakeSize.x, 0f, 0f)).magnitude;
+            float physicalZ = baker.transform.TransformVector(new Vector3(0f, 0f, baker.BakeSize.y)).magnitude;
+            float coarse = Mathf.Max(physicalX, physicalZ) / 100f;
+            float fine = Mathf.Max(.025f, Mathf.Min(physicalX, physicalZ) / size);
             // Shared edge decisions and 1/2/3-edge splits keep the adaptive mesh conforming.
             // Only the generated copy is refined; a rebake reuses sufficient density.
             for (int pass = 0; pass < 10; pass++)
@@ -55,11 +57,14 @@ namespace Meganeura.Water.Editor
                             float spacing=coarse;
                             foreach (Collider obstacle in obstacles)
                             {
-                                Vector3 delta=baker.transform.InverseTransformVector(obstacle.ClosestPoint(baker.transform.TransformPoint(middle))-baker.transform.TransformPoint(middle));
-                                if (new Vector2(delta.x,delta.z).magnitude < Mathf.Max(1f,baker.SteeringDistance*1.5f)) spacing=fine;
+                                Vector3 world = baker.transform.TransformPoint(middle);
+                                Vector3 delta = obstacle.ClosestPoint(world) - world;
+                                Vector3 planeNormal = StylizedWaterFlowBakerUtility.WorldPlaneNormal(baker.transform);
+                                float planarDistance = (delta - planeNormal * Vector3.Dot(delta, planeNormal)).magnitude;
+                                if (planarDistance < Mathf.Max(1f,baker.SteeringDistance*1.5f)) spacing=fine;
                             }
                             m[e]=-1;
-                            if ((vertices[a]-vertices[b]).sqrMagnitude > spacing*spacing)
+                            if (baker.transform.TransformVector(vertices[a]-vertices[b]).sqrMagnitude > spacing*spacing)
                             { m[e]=vertices.Count; vertices.Add(middle); }
                             edges.Add(key,m[e]);
                         }
@@ -95,7 +100,11 @@ namespace Meganeura.Water.Editor
             var labels = new int[count];
             var correction = new float[count];
             var queue = new Queue<int>();
-            float dx = baker.BakeSize.x / size, dz = baker.BakeSize.y / size;
+            float localDx = baker.BakeSize.x / size, localDz = baker.BakeSize.y / size;
+            Vector3 worldStepX = baker.transform.TransformVector(new Vector3(localDx, 0f, 0f));
+            Vector3 worldStepZ = baker.transform.TransformVector(new Vector3(0f, 0f, localDz));
+            float dx = worldStepX.magnitude, dz = worldStepZ.magnitude;
+            float cellArea = Vector3.Cross(worldStepX, worldStepZ).magnitude;
             float largestRadius = 0f;
             int component = 0;
             for (int seed = 0; seed < count; seed++)
@@ -126,16 +135,17 @@ namespace Meganeura.Water.Editor
                 }
                 // A bank-attached intrusion shares the bank contour. Crossing both
                 // sides cannot be solved by a local steering field.
-                if (bankCount > 0 && bankMin < -2 * dz && bankMax > 2 * dz)
+                float cellThreshold = 2f * Mathf.Min(dx, dz);
+                if (bankCount > 0 && bankMin < -cellThreshold && bankMax > cellThreshold)
                     throw new InvalidOperationException("[Water Flow Baker] Obstacle spans both sides of the channel. Clear a passage or edit the centerline; no automatic rerouting was attempted.");
                 float contour = bankCount > 0 ? bankSum / bankCount : sum / cells.Count;
                 foreach (int i in cells) correction[i] = contour - transverse[i];
-                largestRadius = Mathf.Max(largestRadius, Mathf.Sqrt(cells.Count * dx * dz / Mathf.PI));
+                largestRadius = Mathf.Max(largestRadius, Mathf.Sqrt(cells.Count * cellArea / Mathf.PI));
             }
             if (component == 0) return banks;
 
-            // Strength controls reach, not solid permeability. Distance is in local
-            // XZ units, not square UV texels (which distorted the old gradient).
+            // Strength controls reach, not solid permeability. Distance is measured
+            // in transformed world units, not square UV texels.
             float reach = Mathf.Max(2 * largestRadius, baker.SteeringDistance * (.5f + baker.SteeringStrength));
             float wx = 1f / (dx * dx), wz = 1f / (dz * dz);
             float denominator = 2 * (wx + wz) + 1f / (reach * reach);
@@ -173,19 +183,31 @@ namespace Meganeura.Water.Editor
             {
                 // Sobel derivative suppresses occupancy stair steps without blurring
                 // directions across the solid or changing Flow Strength.
-                float gx = (correction[i+1-size] + 2*correction[i+1] + correction[i+1+size]
-                    - correction[i-1-size] - 2*correction[i-1] - correction[i-1+size]) / (8*dx);
-                float gz = (correction[i+size-1] + 2*correction[i+size] + correction[i+size+1]
-                    - correction[i-size-1] - 2*correction[i-size] - correction[i-size+1]) / (8*dz);
-                Vector2 localBase = Vector2.Scale(backbone[i], baker.BakeSize).normalized;
-                Vector2 localBanks = Vector2.Scale(banks[i], baker.BakeSize).normalized;
-                Vector2 direction = localBase + new Vector2(gz, -gx);
+                // The contour value and derivative are in world units. A Sobel
+                // field is assembled first, then converted through the full local
+                // XZ metric so non-uniform scale cannot change steering reach.
+                float[] sobelValues = correction;
+                float gx = (sobelValues[i+1-size] + 2*sobelValues[i+1] + sobelValues[i+1+size]
+                    - sobelValues[i-1-size] - 2*sobelValues[i-1] - sobelValues[i-1+size]) / 8f;
+                float gz = (sobelValues[i+size-1] + 2*sobelValues[i+size] + sobelValues[i+size+1]
+                    - sobelValues[i-size-1] - 2*sobelValues[i-size] - sobelValues[i-size+1]) / 8f;
+                Vector3 axisX = worldStepX / Mathf.Max(1e-6f, dx);
+                Vector3 axisZ = worldStepZ / Mathf.Max(1e-6f, dz);
+                float derivativeX = gx / Mathf.Max(1e-6f, dx);
+                float derivativeZ = gz / Mathf.Max(1e-6f, dz);
+                float axisDot = Mathf.Clamp(Vector3.Dot(axisX, axisZ), -.9999f, .9999f);
+                float metricInverse = 1f / Mathf.Max(1e-5f, 1f - axisDot * axisDot);
+                Vector3 gradientWorld = axisX * ((derivativeX - axisDot * derivativeZ) * metricInverse)
+                    + axisZ * ((derivativeZ - axisDot * derivativeX) * metricInverse);
+                Vector3 worldBase = StylizedWaterFlowBakerUtility.WorldDirectionFromUV(baker, backbone[i]);
+                Vector3 worldBanks = StylizedWaterFlowBakerUtility.WorldDirectionFromUV(baker, banks[i]);
+                Vector3 direction = worldBase + Vector3.Cross(StylizedWaterFlowBakerUtility.WorldPlaneNormal(baker.transform), gradientWorld);
                 // Do not add bank repulsion near a solid: both constraints are already
                 // present in the scalar interpolation. Preserve bank-only behavior far away.
-                float influence = Mathf.Clamp01(new Vector2(gx,gz).magnitude * 12f);
-                direction += (localBanks-localBase) * (1-influence);
-                if (Vector2.Dot(direction, localBase) <= 0) reverse++;
-                result[i] = new Vector2(direction.x / baker.BakeSize.x, direction.y / baker.BakeSize.y).normalized;
+                float influence = Mathf.Clamp01(gradientWorld.magnitude * 12f);
+                direction += (worldBanks-worldBase) * (1-influence);
+                if (Vector3.Dot(direction, worldBase) <= 0) reverse++;
+                result[i] = StylizedWaterFlowBakerUtility.UVDirectionFromWorld(baker, direction.normalized);
             }
             if (reverse > 0)
                 Debug.LogWarning($"[Water Flow Baker] {reverse} obstacle samples lack downstream progression. Inspect Direction Debug; this obstruction may exceed local steering scope.", baker);

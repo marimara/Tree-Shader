@@ -1,0 +1,2 @@
+Valid triangle centroids: 98426
+Abs transverse chart velocity p50/p90/p99/max: 0,02470274 / 0,1214058 / 0,4593563 / 0,9496375

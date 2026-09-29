@@ -49,12 +49,14 @@ Material:
     - _NoiseStretch: 2.5
     - _Opacity: 0.72
     - _PatternIntensity: 0.55
-    - _PatternScale: 2.61
+    - _PatternScale: 1.65
     - _PatternSoftness: 0.085
     - _PatternSourceMode: 3
     - _PatternStrength: 0.72
-    - _PatternStretch: 4.9
-    - _PatternThreshold: 0.4
+    - _PatternStretch: 7
+    - _PatternThreshold: 0.5
+    - _PrimaryMarkWidth: 4
+    - _SecondaryMarkStrength: 0.24
     - _UseFlowCoordinates: 1
     - _UseFlowMap: 1
     m_Colors:

@@ -17,13 +17,15 @@ Shader "Meganeura/Water/Stylized Water"
         _FlowMapMaxStrength ("Flow Map Max Strength", Range(0.0, 1.0)) = 0.82
         _FlowMapOrientationInfluence ("Flow Map Orientation Influence", Range(0.0, 1.0)) = 0.72
         [Enum(Off, 0, Direction, 1, Strength, 2)] _FlowDebugMode ("Flow Debug Mode", Float) = 0.0
-        [Enum(Procedural, 0, Texture, 1, Raw Hybrid, 2, Shaped Hybrid, 3)] _PatternSourceMode ("Pattern Source Mode", Float) = 3.0
+        [Enum(Procedural, 0, Texture, 1, Raw Hybrid, 2, Painterly Flow, 3, Generated Pattern, 4)] _PatternSourceMode ("Pattern Source Mode", Float) = 3.0
         [NoScaleOffset] _NoiseTex ("Noise Texture", 2D) = "gray" {}
-        _PatternScale ("Pattern Scale", Range(0.1, 10.0)) = 2.2
+        _PrimaryMarkWidth ("Primary Mark Width", Range(1.0, 8.0)) = 4.0
+        _SecondaryMarkStrength ("Secondary Mark Strength", Range(0.0, 0.5)) = 0.24
+        _PatternScale ("Pattern Scale", Range(0.1, 10.0)) = 1.65
         _PatternStrength ("Pattern Strength", Range(0.0, 1.0)) = 0.55
-        _PatternStretch ("Pattern Stretch", Range(1.0, 12.0)) = 4.0
+        _PatternStretch ("Pattern Stretch", Range(1.0, 12.0)) = 7.0
         [HDR] _PatternColor ("Pattern Color", Color) = (0.62, 1.15, 1.30, 0.85)
-        _PatternThreshold ("Pattern Threshold", Range(0.0, 1.0)) = 0.62
+        _PatternThreshold ("Pattern Threshold", Range(0.0, 1.0)) = 0.5
         _PatternSoftness ("Pattern Softness", Range(0.01, 0.25)) = 0.075
         [HideInInspector] _NoiseScale ("Legacy Noise Scale", Range(0.1, 10.0)) = 2.0
         _NoiseContrast ("Noise Contrast", Range(0.1, 4.0)) = 1.35
@@ -73,6 +75,8 @@ Shader "Meganeura/Water/Stylized Water"
                 half _FlowMapOrientationInfluence;
                 half _FlowDebugMode;
                 half _PatternSourceMode;
+                half _PrimaryMarkWidth;
+                half _SecondaryMarkStrength;
                 half _PatternScale;
                 half _PatternStrength;
                 half _PatternStretch;
@@ -226,28 +230,37 @@ Shader "Meganeura/Water/Stylized Water"
                 return smoothstep(0.22h, 0.78h, ApplyPatternContrast(combinedNoise));
             }
 
+            half ShapeAuthoredMark(half value)
+            {
+                // Lift the source's soft midtones instead of retaining only its
+                // bright cores. No independent procedural gate or UV distortion.
+                half authored = ApplyPatternContrast(sqrt(max(value, 0.0h)));
+                half softness = max(_PatternSoftness, (half)fwidth(authored));
+                return smoothstep(_PatternThreshold - softness,
+                    _PatternThreshold + softness, authored);
+            }
+
             half GetShapedHybridPattern(float2 patternUV, half flowStrength)
             {
-                // Noise 1 supplies the authored silhouette. A low-frequency analytic
-                // field only bends it slightly and gates it into separated marks.
-                half distortionField = ProceduralNoise(patternUV * 0.38h + float2(4.7h, 11.3h));
-                float2 distortedUV = patternUV + float2(distortionField - 0.5h, 0.5h - distortionField) * 0.12h;
-                half authoredNoise = SAMPLE_TEXTURE2D(_NoiseTex, sampler_NoiseTex, distortedUV).r;
-                half shapedSource = saturate((authoredNoise - 0.5h) * _NoiseContrast + 0.5h);
+                float2 uv = patternUV * float2(2.0, 1.0 / max(_PrimaryMarkWidth, 1.0h));
+                half primary = ShapeAuthoredMark(SAMPLE_TEXTURE2D(_NoiseTex, sampler_NoiseTex, uv).r);
+                // Integer scale shares the primary's exact repeat and velocity.
+                half secondary = ShapeAuthoredMark(SAMPLE_TEXTURE2D(_NoiseTex, sampler_NoiseTex,
+                    uv * 2.0 + float2(0.37, 0.61)).r);
+                half mass = sqrt(SAMPLE_TEXTURE2D(_NoiseTex, sampler_NoiseTex, uv * 0.5 + float2(0.19, 0.73)).r);
+                half gate = smoothstep(0.16h, 0.50h, mass);
+                return saturate(primary * gate + (1.0h - primary) * secondary * _SecondaryMarkStrength * gate);
+            }
 
-                half flowCharacter = smoothstep(0.0h, 1.0h, flowStrength);
-                half effectiveThreshold = saturate(_PatternThreshold + lerp(0.16h, -0.10h, flowCharacter));
-                half edgeSoftness = max(_PatternSoftness * lerp(1.35h, 1.0h, flowCharacter), 0.005h);
-                half thresholdMask = smoothstep(
-                    effectiveThreshold - edgeSoftness,
-                    effectiveThreshold + edgeSoftness,
-                    shapedSource);
-
-                half selectiveField = ProceduralNoise(patternUV * float2(0.42h, 0.58h) + float2(19.1h, 3.4h));
-                half selectiveLow = lerp(0.54h, 0.22h, flowCharacter);
-                half selectiveHigh = lerp(0.78h, 0.56h, flowCharacter);
-                half selectiveMask = smoothstep(selectiveLow, selectiveHigh, selectiveField);
-                return thresholdMask * selectiveMask;
+            half GetGeneratedPattern(float2 patternUV)
+            {
+                // SPEC-011.7 sources already contain authored silhouette and
+                // distribution. Keep only aspect control and moderate shaping.
+                float2 uv = patternUV * float2(1.0, 1.0 / max(_PrimaryMarkWidth, 1.0h));
+                half source = ApplyPatternContrast(SAMPLE_TEXTURE2D(_NoiseTex, sampler_NoiseTex, uv).r);
+                half softness = max(_PatternSoftness, (half)fwidth(source));
+                return smoothstep(_PatternThreshold - softness,
+                    _PatternThreshold + softness, source);
             }
 
             half GetPatternSource(float2 patternUV, half flowStrength)
@@ -261,7 +274,10 @@ Shader "Meganeura/Water/Stylized Water"
                 if (_PatternSourceMode < 2.5h)
                     return GetHybridPattern(patternUV);
 
-                return GetShapedHybridPattern(patternUV, flowStrength);
+                if (_PatternSourceMode < 3.5h)
+                    return GetShapedHybridPattern(patternUV, flowStrength);
+
+                return GetGeneratedPattern(patternUV);
             }
 
             float2 SampleFlowMapDirection(float2 uv)
@@ -384,6 +400,38 @@ Shader "Meganeura/Water/Stylized Water"
                 return lerp(b, a, weight);
             }
 
+            half GetStableChannelPattern(float2 channelUV, float4 frame, FlowData flow)
+            {
+                float2 along = frame.xy, across = frame.zw;
+                float determinant = along.x * across.y - along.y * across.x;
+                float safeDet = abs(determinant) > 1e-12 ? determinant : 1.0;
+                float alongVelocity = (across.y * flow.direction.x - across.x * flow.direction.y) / safeDet;
+                float directionSign = abs(determinant) > 1e-12 ? sign(alongVelocity) : 0.0;
+
+                // The baked transverse chart already routes around obstacles.
+                // Re-advecting it with tiny RG/frame interpolation residuals
+                // double-deforms it and amplifies mesh/texel interpolation errors.
+                half stretch, scale;
+                GetPatternMetrics(flow.strength, stretch, scale);
+                // A fixed map-space reference keeps one clock across the chart.
+                // B still controls local spatial frequency, elongation and opacity;
+                // a smaller longitudinal frequency produces faster local travel.
+                // Constant-B surfaces retain the full SPEC-007 speed response.
+                // This avoids time * spatially-varying velocity, whose derivative
+                // grows forever even when the sampling coordinates are wrapped.
+                FlowData clockFlow = GetFlowData(float2(0.5, 0.5));
+                half referenceStretch, referenceScale;
+                GetPatternMetrics(clockFlow.strength, referenceStretch, referenceScale);
+                half character = smoothstep(0.0h, 1.0h, clockFlow.strength);
+                float clockRate = _FlowSpeed * lerp(0.06h, 1.0h, character)
+                    * referenceScale / max(referenceStretch, 0.0001h);
+                float2 uv = channelUV * float2(scale / max(stretch, 0.0001h), referenceScale);
+                // One pattern-unit is an exact repeat for primary x2,
+                // secondary x4 and the low-frequency authored gate x1. No fading or phase reset.
+                uv.x -= directionSign * frac(_Time.y * clockRate);
+                return GetPatternSource(uv, flow.strength);
+            }
+
             Varyings Vert(Attributes input)
             {
                 Varyings output;
@@ -422,7 +470,9 @@ Shader "Meganeura/Water/Stylized Water"
                 if (_UseFlowMap > 0.5h)
                 {
                     pattern = _UseFlowCoordinates > 0.5h
-                        ? GetChannelPattern(input.flowUV, input.flowFrame, flow)
+                        ? (_PatternSourceMode > 2.5h
+                            ? GetStableChannelPattern(input.flowUV, input.flowFrame, flow)
+                            : GetChannelPattern(input.flowUV, input.flowFrame, flow))
                         : GetDualPhaseFlowMapPattern(input.uv, flow);
                 }
                 else

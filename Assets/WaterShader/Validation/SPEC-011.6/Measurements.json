@@ -1,0 +1,19 @@
+{
+  "F_BaselineStraight": {
+    "one_second_displacement_px": 142,
+    "one_second_translation_correlation": 0.750645536546576,
+    "visible_coverage_red_gt_50": 0.03861874559548978,
+    "vertical_mark_run_px_median": 1.0,
+    "vertical_mark_run_px_p90": 2.0
+  },
+  "G_StraightGateMotion": {
+    "one_second_displacement_px": 142,
+    "one_second_translation_correlation": 0.9999773688567501,
+    "visible_coverage_red_gt_50": 0.05740662438336857,
+    "vertical_mark_run_px_median": 4.0,
+    "vertical_mark_run_px_p90": 10.0,
+    "adjacent_frame_MAE_mean": 2.1661490165929913,
+    "adjacent_frame_MAE_max": 2.430429880197322,
+    "frames": 540
+  }
+}

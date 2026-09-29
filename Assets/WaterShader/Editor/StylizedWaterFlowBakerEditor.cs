@@ -152,7 +152,7 @@ namespace Meganeura.Water.Editor
         struct PathSample
         {
             public float t;
-            public Vector2 position;
+            public Vector3 worldPosition;
         }
 
         public static Texture2D Bake(StylizedWaterFlowBaker baker, bool assign)
@@ -188,11 +188,15 @@ namespace Meganeura.Water.Editor
                 if (valid[index]) validCount++;
                 if (isBlocked) blockedCount++;
 
-                float pathT = ClosestPathParameter(baker, path, new Vector2(local.x, local.z));
+                float pathT = ClosestPathParameter(baker, path, local);
                 pathParameters[index] = pathT;
                 Vector3 tangent = baker.EvaluateLocalTangent(pathT);
                 Vector3 center = baker.EvaluateLocal(pathT);
-                transverse[index] = Vector3.Dot(local - center, new Vector3(-tangent.z, 0f, tangent.x));
+                Vector3 worldTangent = TransformPlanarDirection(baker.transform, tangent);
+                Vector3 worldAcross = WorldAcrossDirection(baker.transform, worldTangent, tangent);
+                transverse[index] = Vector3.Dot(
+                    baker.transform.TransformPoint(local) - baker.transform.TransformPoint(center),
+                    worldAcross);
                 Vector2 uvDirection = new Vector2(tangent.x / baker.BakeSize.x, tangent.z / baker.BakeSize.y);
                 baseDirections[index] = uvDirection.sqrMagnitude > 1e-10f ? uvDirection.normalized : Vector2.right;
             }
@@ -202,9 +206,9 @@ namespace Meganeura.Water.Editor
             float[] distance = null;
             if (baker.UseBoundaryAndObstacles)
             {
-                distance = BuildDistanceField(valid, size);
-                // Banks keep their validated local treatment; internal solids have separate constraints.
-                finalDirections = ApplyLocalSteering(baker, water, blocked, BuildDistanceField(water, size), baseDirections, size);
+                distance = BuildDistanceField(baker, valid, size);
+                // Banks and obstacles use physical distances while preserving the local Flow Map domain.
+                finalDirections = ApplyLocalSteering(baker, water, blocked, BuildDistanceField(baker, water, size), baseDirections, size);
                 finalDirections = WaterObstacleContours.Steer(baker, water, blocked, transverse, baseDirections, finalDirections, size, out obstacleCoordinates);
                 ValidateCenterline(baker, obstacles);
                 WriteDiagnostics(baker, size, valid, blocked, distance);
@@ -265,6 +269,11 @@ namespace Meganeura.Water.Editor
             Undo.RecordObject(material, "Assign Baked Water Flow Map");
             material.SetTexture("_FlowMap", texture);
             material.SetFloat("_UseFlowMap", 1f);
+            MeshFilter filter = baker.GetComponent<MeshFilter>();
+            bool compatibleMeshAssigned = baker.GenerateCompatibleFlowCoordinates &&
+                baker.GeneratedFlowMesh != null && filter != null && filter.sharedMesh == baker.GeneratedFlowMesh;
+            if (compatibleMeshAssigned && material.HasProperty("_UseFlowCoordinates"))
+                material.SetFloat("_UseFlowCoordinates", 1f);
             EditorUtility.SetDirty(material);
             AssetDatabase.SaveAssetIfDirty(material);
         }
@@ -276,7 +285,11 @@ namespace Meganeura.Water.Editor
             {
                 float t = i / (count - 1f);
                 Vector3 p = baker.EvaluateLocal(t);
-                samples[i] = new PathSample { t = t, position = new Vector2(p.x, p.z) };
+                samples[i] = new PathSample
+                {
+                    t = t,
+                    worldPosition = baker.transform.TransformPoint(p)
+                };
             }
             return samples;
         }
@@ -309,39 +322,43 @@ namespace Meganeura.Water.Editor
             var frames = new List<Vector4>(vertices.Length);
             float[] accumulated = new float[path.Length];
             for (int i = 1; i < path.Length; i++)
-                accumulated[i] = accumulated[i - 1] + Vector2.Distance(path[i - 1].position, path[i].position);
+                accumulated[i] = accumulated[i - 1] + Vector3.Distance(path[i - 1].worldPosition, path[i].worldPosition);
 
             for (int i = 0; i < vertices.Length; i++)
             {
                 Vector3 local = vertices[i];
-                Vector2 point = new Vector2(local.x, local.z);
-                float t = ClosestPathParameter(baker, path, point);
+                float t = ClosestPathParameter(baker, path, local);
                 Vector3 center3 = baker.EvaluateLocal(t), tangent3 = baker.EvaluateLocalTangent(t);
-                Vector2 tangent = new Vector2(tangent3.x, tangent3.z).normalized;
-                Vector2 normal = new Vector2(-tangent.y, tangent.x);
+                Vector3 worldTangent = TransformPlanarDirection(baker.transform, tangent3);
+                Vector3 worldAcross = WorldAcrossDirection(baker.transform, worldTangent, tangent3);
                 float scaled = t * (path.Length - 1);
                 int sample = Mathf.Min(Mathf.FloorToInt(scaled), path.Length - 2);
                 float alongDistance = Mathf.Lerp(accumulated[sample], accumulated[sample + 1], scaled - sample);
-                float acrossDistance = Vector2.Dot(point - new Vector2(center3.x, center3.z), normal);
+                float acrossDistance = Vector3.Dot(
+                    baker.transform.TransformPoint(local) - baker.transform.TransformPoint(center3),
+                    worldAcross);
                 mapUV[i] = baker.UVFromLocal(local);
                 if (obstacleCoordinates != null)
                     acrossDistance = WaterObstacleContours.Sample(obstacleCoordinates, size, mapUV[i]);
                 chartUV[i] = new Vector2(alongDistance / baker.FlowCoordinateWorldScale.x, acrossDistance / baker.FlowCoordinateWorldScale.y);
-                Vector2 alongFrame = tangent, acrossFrame = normal;
+                Vector3 frameWorldAlong = worldTangent;
                 if (obstacleCoordinates != null)
                 {
                     // Match the exact stored/bilinearly sampled RG field, including
                     // its derivative stencil and bank blend, not a second derivative
                     // approximation that introduces transverse chart velocity.
                     Vector2 uvFlow = WaterObstacleContours.Sample(directions, size, mapUV[i]);
-                    alongFrame = Vector2.Scale(uvFlow, baker.BakeSize).normalized;
-                    acrossFrame = new Vector2(-alongFrame.y, alongFrame.x);
+                    Vector2 localFlow = Vector2.Scale(uvFlow, baker.BakeSize);
+                    frameWorldAlong = TransformPlanarDirection(baker.transform, new Vector3(localFlow.x, 0f, localFlow.y));
                 }
+                Vector3 frameWorldAcross = WorldAcrossDirection(baker.transform, frameWorldAlong, tangent3);
+                Vector3 localAlongPerWorldUnit = baker.transform.InverseTransformVector(frameWorldAlong);
+                Vector3 localAcrossPerWorldUnit = baker.transform.InverseTransformVector(frameWorldAcross);
                 frames.Add(new Vector4(
-                    alongFrame.x * baker.FlowCoordinateWorldScale.x / baker.BakeSize.x,
-                    alongFrame.y * baker.FlowCoordinateWorldScale.x / baker.BakeSize.y,
-                    acrossFrame.x * baker.FlowCoordinateWorldScale.y / baker.BakeSize.x,
-                    acrossFrame.y * baker.FlowCoordinateWorldScale.y / baker.BakeSize.y));
+                    localAlongPerWorldUnit.x * baker.FlowCoordinateWorldScale.x / baker.BakeSize.x,
+                    localAlongPerWorldUnit.z * baker.FlowCoordinateWorldScale.x / baker.BakeSize.y,
+                    localAcrossPerWorldUnit.x * baker.FlowCoordinateWorldScale.y / baker.BakeSize.x,
+                    localAcrossPerWorldUnit.z * baker.FlowCoordinateWorldScale.y / baker.BakeSize.y));
             }
             working.uv = mapUV;
             working.uv2 = chartUV;
@@ -380,14 +397,15 @@ namespace Meganeura.Water.Editor
             AssetDatabase.SaveAssetIfDirty(result);
         }
 
-        static float ClosestPathParameter(StylizedWaterFlowBaker baker, PathSample[] samples, Vector2 point)
+        static float ClosestPathParameter(StylizedWaterFlowBaker baker, PathSample[] samples, Vector3 localPoint)
         {
+            Vector3 worldPoint = baker.transform.TransformPoint(localPoint);
             float bestDistance = float.MaxValue, bestT = 0f;
             for (int i = 0; i < samples.Length - 1; i++)
             {
-                Vector2 a = samples[i].position, delta = samples[i + 1].position - a;
-                float f = delta.sqrMagnitude > 1e-10f ? Mathf.Clamp01(Vector2.Dot(point - a, delta) / delta.sqrMagnitude) : 0f;
-                float distance = (point - (a + delta * f)).sqrMagnitude;
+                Vector3 a = samples[i].worldPosition, delta = samples[i + 1].worldPosition - a;
+                float f = delta.sqrMagnitude > 1e-10f ? Mathf.Clamp01(Vector3.Dot(worldPoint - a, delta) / delta.sqrMagnitude) : 0f;
+                float distance = (worldPoint - (a + delta * f)).sqrMagnitude;
                 if (distance < bestDistance)
                 {
                     bestDistance = distance;
@@ -399,8 +417,9 @@ namespace Meganeura.Water.Editor
             for (int iteration = 0; iteration < 8; iteration++)
             {
                 float aT = Mathf.Lerp(lo, hi, 1f / 3f), bT = Mathf.Lerp(lo, hi, 2f / 3f);
-                Vector3 a = baker.EvaluateLocal(aT), b = baker.EvaluateLocal(bT);
-                if ((new Vector2(a.x, a.z) - point).sqrMagnitude < (new Vector2(b.x, b.z) - point).sqrMagnitude) hi = bT;
+                Vector3 a = baker.transform.TransformPoint(baker.EvaluateLocal(aT));
+                Vector3 b = baker.transform.TransformPoint(baker.EvaluateLocal(bT));
+                if ((a - worldPoint).sqrMagnitude < (b - worldPoint).sqrMagnitude) hi = bT;
                 else lo = aT;
             }
             return (lo + hi) * .5f;
@@ -443,38 +462,47 @@ namespace Meganeura.Water.Editor
         {
             Vector3 world = baker.transform.TransformPoint(local);
             // Clearance for the derivative stencil and bilinear runtime sampling.
-            float cellRadius = 1.5f * Mathf.Max(baker.BakeSize.x, baker.BakeSize.y) / size;
+            Vector3 cellX = baker.transform.TransformVector(new Vector3(baker.BakeSize.x / size, 0f, 0f));
+            Vector3 cellZ = baker.transform.TransformVector(new Vector3(0f, 0f, baker.BakeSize.y / size));
+            float cellRadius = 1.5f * Mathf.Max(cellX.magnitude, cellZ.magnitude);
+            Vector3 planeNormal = WorldPlaneNormal(baker.transform);
             foreach (Collider collider in obstacles)
             {
                 Vector3 closest = collider.ClosestPoint(world);
-                Vector3 delta = baker.transform.InverseTransformVector(closest - world);
-                float horizontal = new Vector2(delta.x, delta.z).magnitude;
-                bool verticallyRelevant = collider.bounds.min.y <= world.y + .5f && collider.bounds.max.y >= world.y - .5f;
+                Vector3 delta = closest - world;
+                float planeDistance = Mathf.Abs(Vector3.Dot(delta, planeNormal));
+                float horizontal = (delta - planeNormal * Vector3.Dot(delta, planeNormal)).magnitude;
+                bool verticallyRelevant = planeDistance <= Mathf.Max(.5f, cellRadius);
                 if (verticallyRelevant && horizontal <= cellRadius) return true;
             }
             return false;
         }
 
-        static float[] BuildDistanceField(bool[] valid, int size)
+        static float[] BuildDistanceField(StylizedWaterFlowBaker baker, bool[] valid, int size)
         {
-            const float diagonal = 1.41421356f;
+            Vector3 stepX = baker.transform.TransformVector(new Vector3(baker.BakeSize.x / size, 0f, 0f));
+            Vector3 stepZ = baker.transform.TransformVector(new Vector3(0f, 0f, baker.BakeSize.y / size));
+            float costX = stepX.magnitude;
+            float costZ = stepZ.magnitude;
+            float diagonalPositive = (stepX + stepZ).magnitude;
+            float diagonalNegative = (stepX - stepZ).magnitude;
             var distance = new float[valid.Length];
             for (int i = 0; i < distance.Length; i++) distance[i] = valid[i] ? 1e6f : 0f;
             for (int y = 0; y < size; y++) for (int x = 0; x < size; x++)
             {
                 int i = y * size + x;
-                if (x > 0) distance[i] = Mathf.Min(distance[i], distance[i - 1] + 1f);
-                if (y > 0) distance[i] = Mathf.Min(distance[i], distance[i - size] + 1f);
-                if (x > 0 && y > 0) distance[i] = Mathf.Min(distance[i], distance[i - size - 1] + diagonal);
-                if (x + 1 < size && y > 0) distance[i] = Mathf.Min(distance[i], distance[i - size + 1] + diagonal);
+                if (x > 0) distance[i] = Mathf.Min(distance[i], distance[i - 1] + costX);
+                if (y > 0) distance[i] = Mathf.Min(distance[i], distance[i - size] + costZ);
+                if (x > 0 && y > 0) distance[i] = Mathf.Min(distance[i], distance[i - size - 1] + diagonalPositive);
+                if (x + 1 < size && y > 0) distance[i] = Mathf.Min(distance[i], distance[i - size + 1] + diagonalNegative);
             }
             for (int y = size - 1; y >= 0; y--) for (int x = size - 1; x >= 0; x--)
             {
                 int i = y * size + x;
-                if (x + 1 < size) distance[i] = Mathf.Min(distance[i], distance[i + 1] + 1f);
-                if (y + 1 < size) distance[i] = Mathf.Min(distance[i], distance[i + size] + 1f);
-                if (x + 1 < size && y + 1 < size) distance[i] = Mathf.Min(distance[i], distance[i + size + 1] + diagonal);
-                if (x > 0 && y + 1 < size) distance[i] = Mathf.Min(distance[i], distance[i + size - 1] + diagonal);
+                if (x + 1 < size) distance[i] = Mathf.Min(distance[i], distance[i + 1] + costX);
+                if (y + 1 < size) distance[i] = Mathf.Min(distance[i], distance[i + size] + costZ);
+                if (x + 1 < size && y + 1 < size) distance[i] = Mathf.Min(distance[i], distance[i + size + 1] + diagonalPositive);
+                if (x > 0 && y + 1 < size) distance[i] = Mathf.Min(distance[i], distance[i + size - 1] + diagonalNegative);
             }
             return distance;
         }
@@ -483,8 +511,7 @@ namespace Meganeura.Water.Editor
         {
             EnsureFolder("Assets/WaterShader/Generated/Diagnostics");
             var pixels = new Color[valid.Length];
-            float cellWorld = .5f * (baker.BakeSize.x + baker.BakeSize.y) / size;
-            float range = Mathf.Max(1f, baker.SteeringDistance / Mathf.Max(.0001f, cellWorld));
+            float range = Mathf.Max(.0001f, baker.SteeringDistance);
             for (int i = 0; i < pixels.Length; i++)
             {
                 if (blocked[i]) pixels[i] = new Color(1f, 0f, .65f, 1f);
@@ -525,27 +552,81 @@ namespace Meganeura.Water.Editor
         static Vector2[] ApplyLocalSteering(StylizedWaterFlowBaker baker, bool[] valid, bool[] blocked, float[] distance, Vector2[] baseDirections, int size)
         {
             var result = (Vector2[])baseDirections.Clone();
-            float cellWorld = .5f * (baker.BakeSize.x + baker.BakeSize.y) / size;
-            float influenceCells = Mathf.Max(1f, baker.SteeringDistance / Mathf.Max(.0001f, cellWorld));
             for (int y = 1; y < size - 1; y++) for (int x = 1; x < size - 1; x++)
             {
                 int i = y * size + x;
                 if (!valid[i]) continue;
-                float proximity = 1f - Mathf.Clamp01(distance[i] / influenceCells);
+                float proximity = 1f - Mathf.Clamp01(distance[i] / Mathf.Max(.0001f, baker.SteeringDistance));
                 if (proximity <= 0f) continue;
-                Vector2 inward = new Vector2(distance[i + 1] - distance[i - 1], distance[i + size] - distance[i - size]);
-                if (inward.sqrMagnitude < 1e-8f) continue;
-                inward.Normalize();
+                Vector3 inwardWorld = GridGradientWorld(baker, distance, i, size);
+                if (inwardWorld.sqrMagnitude < 1e-8f) continue;
+                inwardWorld.Normalize();
                 Vector2 forward = baseDirections[i];
-                Vector2 lateral = inward - forward * Vector2.Dot(inward, forward);
-                float outwardRisk = Mathf.Max(0f, -Vector2.Dot(forward, inward));
+                Vector3 forwardWorld = WorldDirectionFromUV(baker, forward);
+                Vector3 lateralWorld = inwardWorld - forwardWorld * Vector3.Dot(inwardWorld, forwardWorld);
+                float outwardRisk = Mathf.Max(0f, -Vector3.Dot(forwardWorld, inwardWorld));
                 float localInfluence = proximity * baker.SteeringStrength * Mathf.Max(.35f, outwardRisk);
-                if (lateral.sqrMagnitude > 1e-8f)
-                    result[i] = (forward + lateral.normalized * localInfluence).normalized;
+                Vector3 resultWorld = forwardWorld;
+                if (lateralWorld.sqrMagnitude > 1e-8f)
+                    resultWorld = (forwardWorld + lateralWorld.normalized * localInfluence).normalized;
+                result[i] = UVDirectionFromWorld(baker, resultWorld);
                 if (Vector2.Dot(result[i], forward) < .35f)
                     result[i] = Vector2.Lerp(forward, result[i], .55f).normalized;
             }
             return result;
+        }
+
+        internal static Vector3 WorldPlaneNormal(Transform transform)
+        {
+            Vector3 x = transform.TransformVector(Vector3.right);
+            Vector3 z = transform.TransformVector(Vector3.forward);
+            Vector3 normal = Vector3.Cross(z, x);
+            return normal.sqrMagnitude > 1e-12f ? normal.normalized : transform.up;
+        }
+
+        internal static Vector3 TransformPlanarDirection(Transform transform, Vector3 localDirection)
+        {
+            localDirection.y = 0f;
+            Vector3 world = transform.TransformVector(localDirection);
+            return world.sqrMagnitude > 1e-12f ? world.normalized : transform.right;
+        }
+
+        internal static Vector3 WorldAcrossDirection(Transform transform, Vector3 worldAlong, Vector3 localAlong)
+        {
+            Vector3 across = Vector3.Cross(WorldPlaneNormal(transform), worldAlong).normalized;
+            Vector3 localReference = new Vector3(-localAlong.z, 0f, localAlong.x);
+            if (Vector3.Dot(across, transform.TransformVector(localReference)) < 0f) across = -across;
+            return across;
+        }
+
+        internal static Vector3 WorldDirectionFromUV(StylizedWaterFlowBaker baker, Vector2 uvDirection)
+        {
+            Vector2 local = Vector2.Scale(uvDirection, baker.BakeSize);
+            return TransformPlanarDirection(baker.transform, new Vector3(local.x, 0f, local.y));
+        }
+
+        internal static Vector2 UVDirectionFromWorld(StylizedWaterFlowBaker baker, Vector3 worldDirection)
+        {
+            Vector3 local = baker.transform.InverseTransformVector(worldDirection);
+            Vector2 uv = new Vector2(local.x / baker.BakeSize.x, local.z / baker.BakeSize.y);
+            return uv.sqrMagnitude > 1e-12f ? uv.normalized : Vector2.right;
+        }
+
+        internal static Vector3 GridGradientWorld(StylizedWaterFlowBaker baker, float[] values, int index, int size)
+        {
+            Vector3 stepX = baker.transform.TransformVector(new Vector3(baker.BakeSize.x / size, 0f, 0f));
+            Vector3 stepZ = baker.transform.TransformVector(new Vector3(0f, 0f, baker.BakeSize.y / size));
+            float lengthX = Mathf.Max(1e-6f, stepX.magnitude);
+            float lengthZ = Mathf.Max(1e-6f, stepZ.magnitude);
+            Vector3 axisX = stepX / lengthX;
+            Vector3 axisZ = stepZ / lengthZ;
+            float derivativeX = (values[index + 1] - values[index - 1]) / (2f * lengthX);
+            float derivativeZ = (values[index + size] - values[index - size]) / (2f * lengthZ);
+            float dot = Mathf.Clamp(Vector3.Dot(axisX, axisZ), -.9999f, .9999f);
+            float inverse = 1f / Mathf.Max(1e-5f, 1f - dot * dot);
+            float coefficientX = (derivativeX - dot * derivativeZ) * inverse;
+            float coefficientZ = (derivativeZ - dot * derivativeX) * inverse;
+            return axisX * coefficientX + axisZ * coefficientZ;
         }
 
         static void ValidateCenterline(StylizedWaterFlowBaker baker, Collider[] obstacles)

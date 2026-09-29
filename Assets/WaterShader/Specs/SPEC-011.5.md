@@ -1,1424 +1,581 @@
-# \# SPEC-011.5 — Automatic Mesh Setup and Authoring UX
+# SPEC-011.5 — Automatic Mesh Setup and Authoring UX
 
-# 
+## Objective
 
-# \## Objective
+Improve the Stylized Water Flow Baker authoring workflow so a typical water mesh can be configured with minimal manual setup.
 
-# 
+Add an Editor-side automatic setup workflow capable of deriving as much useful configuration as reasonably possible from:
 
-# Improve the Stylized Water Flow Baker authoring workflow so a typical water mesh can be configured with minimal manual setup.
+- the source water mesh;
+- the object's actual Transform;
+- the existing validated baker architecture.
 
-# 
+The intended workflow should become approximately:
 
-# Add an Editor-side automatic setup workflow capable of deriving as much useful configuration as reasonably possible from the current water mesh.
+1. Add StylizedWaterFlowBaker to a water mesh.
+2. Click Auto Setup From Mesh.
+3. Inspect the generated bounds, boundary and path.
+4. Reverse flow direction if necessary.
+5. Make optional artistic adjustments.
+6. Bake and assign.
+7. The generated material/mesh configuration should immediately use the correct flow-coordinate path.
 
-# 
+The user should not normally need to manually calculate:
 
-# The intended workflow should become approximately:
+- bake bounds;
+- bake center;
+- bake resolution;
+- boundary points;
+- initial centerline;
+- basic steering scale;
+- initial flow-coordinate scale;
+- common target references;
+- required flow-coordinate material state.
 
-# 
+This Spec is focused on authoring UX.
 
-# 1\. Add StylizedWaterFlowBaker to a water mesh.
+Do not change the validated visual behavior of SPEC-010 or SPEC-011.
 
-# 2\. Click Auto Setup From Mesh.
+---
 
-# 3\. Inspect the generated path.
+# Dependencies
 
-# 4\. Reverse flow direction if necessary.
+Requires completed and validated:
 
-# 5\. Make optional artistic adjustments.
+- SPEC-010 — Flow Map Baker Tool
+- SPEC-011 — Collider and Boundary-aware Flow Bake
 
-# 6\. Bake and assign.
+Preserve:
 
-# 
+- centerline-based flow;
+- Flow Map encoding;
+- obstacle contour steering;
+- generated flow-coordinate mesh;
+- existing bake workflow;
+- shader behavior;
+- manual editing capability.
 
-# The user should not normally need to manually calculate:
+Automatic setup supplements manual authoring.
 
-# 
+It must not remove it.
 
-# \- bake bounds;
+---
 
-# \- bake center;
+# Core Principle — Geometry Space vs Physical Space
 
-# \- bake resolution;
+The tool must distinguish between:
 
-# \- boundary points;
+## Local authoring data
 
-# \- initial centerline;
+Data that belongs to the baker's local coordinate system may remain in local space:
 
-# \- basic steering scale;
+- Bake Center;
+- Bake Size;
+- Boundary Points;
+- Centerline Control Points;
+- Flow Map UV mapping.
 
-# \- common target references.
+## Physical / metric-derived settings
 
-# 
+Any value intended to represent actual spatial size, visual scale or distance must account for the object's Transform.
 
-# This Spec is focused on authoring UX.
+Examples include:
 
-# 
+- physical channel length;
+- physical channel width;
+- Flow Coordinate World Scale;
+- Steering Distance;
+- bake-resolution heuristics.
 
-# Do not change the validated visual behavior of SPEC-010 or SPEC-011.
+Do not assume:
 
-# 
+Transform Scale = (1, 1, 1)
 
-# \---
+Do not assume uniform X/Z scaling.
 
-# 
+A water mesh scaled differently on X and Z must still receive sensible automatic settings.
 
-# \# Dependencies
+---
 
-# 
+# Transform Awareness
 
-# Requires completed and validated:
+Auto Setup must inspect the current object Transform.
 
-# 
+At minimum account for:
 
-# \- SPEC-010 — Flow Map Baker Tool
+- local/world scale;
+- non-uniform X/Z scale;
+- rotation where relevant to world-space measurements.
 
-# \- SPEC-011 — Collider and Boundary-aware Flow Bake
+Use appropriate Transform conversion rather than multiplying unrelated scalar values blindly.
 
-# 
+Possible approaches include:
 
-# Preserve:
+- TransformPoint;
+- TransformVector;
+- TransformDirection;
+- transformed sample distances;
+- another equivalent robust method.
 
-# 
+The exact implementation is not prescribed.
 
-# \- centerline-based flow;
+The important requirement is:
 
-# \- Flow Map encoding;
+two visually identical water surfaces should receive comparable physical setup values even if one was modeled at final size and the other reached the same size using Transform scale.
 
-# \- obstacle contour steering;
+---
 
-# \- generated flow-coordinate mesh;
+# Quick Setup UI
 
-# \- existing bake workflow;
+Provide a clearly separated Editor section.
 
-# \- shader behavior;
+Suggested workflow:
 
-# \- manual editing capability.
+Quick Setup
 
-# 
+[ Auto Setup From Mesh ]
 
-# Automatic setup supplements manual authoring.
+optional per-feature setup toggles
 
-# 
+[ Reverse Flow Direction ]
 
-# It must not remove it.
+Advanced/manual settings remain available.
 
-# 
+After Auto Setup, provide a summary of inferred values and relevant warnings.
 
-# \---
+---
 
-# 
+# Auto Setup Scope
 
-# \# Core Goal
+Auto Setup From Mesh should attempt to configure:
 
-# 
+- Target Renderer;
+- Target Material;
+- Output Name;
+- Source Mesh;
+- Bake Center;
+- Bake Size;
+- Bake Resolution;
+- Water Boundary;
+- Initial Centerline;
+- Flow Coordinate settings;
+- Steering Distance;
+- required material flow-coordinate state when applicable.
 
-# Provide a primary Editor action:
+Do not overwrite unrelated material properties.
 
-# 
+---
 
-# Auto Setup From Mesh
+# Target Detection
 
-# 
+Automatically detect the water Renderer and source Mesh.
 
-# The action should inspect the current water object and configure as many baker values as can be derived reliably.
+Prefer components on the same GameObject.
 
-# 
+Configure:
 
-# Automatic setup should favor:
+- Target Renderer;
+- Target Material;
+- Source Mesh.
 
-# 
+Do not modify the imported/source mesh.
 
-# \- useful defaults;
+Generated flow-coordinate meshes must remain separate generated assets.
 
-# \- predictable results;
+---
 
-# \- easy correction;
+# Automatic Bake Bounds
 
-# \- preservation of manual control.
+Determine the footprint from the source mesh in baker local XZ space.
 
-# 
+Derive:
 
-# Do not aim for perfect procedural river understanding.
+- Bake Center;
+- Bake Size.
 
-# 
+These values are intentionally local because they define the Flow Map domain.
 
-# A good editable starting point is preferable to an overly complex automatic solution.
+Add a small sensible padding.
 
-# 
+Do not convert Bake Center / Bake Size into arbitrary world coordinates if the rest of the baker expects local coordinates.
 
-# \---
+Transform awareness for other derived metrics must not break this local-space contract.
 
-# 
+---
 
-# \# Quick Setup UI
+# Automatic Resolution
 
-# 
+Choose a sensible bake resolution based on the actual spatial size and required detail of the water surface.
 
-# Add a clearly separated section in the custom Inspector.
+The implementation may consider:
 
-# 
+- transformed physical size;
+- desired approximate cell size;
+- obstacle/boundary detail;
+- another appropriate metric.
 
-# Suggested structure:
+Do not simply select resolution from the unscaled source mesh dimensions.
 
-# 
+The exact thresholds are implementation decisions.
 
-# Quick Setup
+Avoid unnecessarily high resolution.
 
-# 
+The selected result remains manually editable.
 
-# \[ Auto Setup From Mesh ]
+---
 
-# 
+# Boundary Extraction
 
-# Optional setup controls / toggles
+Extract a usable water footprint from the source mesh.
 
-# 
+Possible methods include:
 
-# \[ Reverse Flow Direction ]
+- mesh boundary edges;
+- projected topology;
+- another robust footprint representation.
 
-# 
+Keep the resulting Boundary Points in baker local space.
 
-# The exact UI may vary.
+Simplify dense boundaries while preserving meaningful shape.
 
-# 
+Handle ambiguous loops conservatively and emit warnings rather than silently generating invalid data.
 
-# Keep the main workflow obvious.
+---
 
-# 
+# Automatic Centerline
 
-# Advanced/manual baker settings should remain available below.
+Generate an initial centerline that broadly follows the middle of the water footprint.
 
-# 
+Support typical:
 
-# \---
+- straight rivers;
+- curved rivers;
+- S-shaped channels;
+- widening channels.
 
-# 
+The centerline remains stored in baker local space.
 
-# \# Auto Setup Scope
+Its geometric generation may use local-space topology because uniform coordinate representation is useful for authoring.
 
-# 
+However, when evaluating:
 
-# Auto Setup From Mesh should attempt to configure:
+- physical path length;
+- physical widths;
+- downstream metric distances;
 
-# 
+use Transform-aware measurements.
 
-# \- Target Renderer;
+Do not use a simple longest-axis line when it ignores the actual channel shape.
 
-# \- Target Material;
+The exact centerline-generation algorithm is not prescribed.
 
-# \- Output Name;
+---
 
-# \- Bake Center;
+# Flow Direction Ambiguity
 
-# \- Bake Size;
+Geometry may determine the path but not upstream/downstream.
 
-# \- Bake Resolution;
+Use a deterministic default.
 
-# \- water boundary;
+Provide:
 
-# \- initial centerline / control points;
+Reverse Flow Direction
 
-# \- Flow Coordinate settings where a reliable default can be estimated;
+This reverses the existing Control Points without rebuilding the entire setup.
 
-# \- Steering Distance where a useful geometric estimate is possible.
+---
 
-# 
+# Flow Coordinate World Scale
 
-# Do not overwrite unrelated material properties.
+This setting must reflect the actual physical proportions of the water surface.
 
-# 
+Do not derive it exclusively from unscaled local mesh dimensions.
 
-# \---
+Automatic estimation should consider transformed measurements such as:
 
-# 
+- physical centerline length;
+- physical average channel width;
+- effective X/Z scale;
+- other reliable physical metrics.
 
-# \# Target Detection
+Non-uniform object scale must not cause the resulting pattern to become unintentionally:
 
-# 
+- extremely thin;
+- extremely wide;
+- compressed;
+- stretched;
+- visually inconsistent with an equivalent Scale = 1 water mesh.
 
-# Automatically detect the renderer associated with the water surface.
+The exact formula is not prescribed.
 
-# 
+Treat this as a geometry-informed artistic default rather than a physically exact value.
 
-# Prefer components on the same GameObject.
+Preserve manual editability.
 
-# 
+Do not aggressively overwrite a deliberately tuned value unless the user explicitly reruns the relevant Auto Setup option.
 
-# Configure:
+---
 
-# 
+# Steering Distance
 
-# Target Renderer
+Estimate Steering Distance using actual physical water dimensions.
 
-# 
+Do not derive it only from unscaled local width.
 
-# and, when appropriate:
+Possible inputs include:
 
-# 
+- transformed average channel width;
+- physical distance to boundaries;
+- actual world-space obstacle/channel proportions.
 
-# Target Material
+The exact mapping is not prescribed.
 
-# 
+Steering Strength remains primarily artistic unless a reliable automatic default is found.
 
-# using the renderer's current shared material.
+---
 
-# 
+# Material / Flow Coordinate Integration
 
-# Do not instantiate or duplicate materials unnecessarily.
+If:
 
-# 
+- Generate Compatible Flow Coordinates is enabled;
+- a compatible generated flow-coordinate mesh is produced;
+- the target shader exposes the expected channel-coordinate option;
 
-# If the object does not contain a compatible renderer/mesh setup, report a useful error.
+Bake And Assign should ensure the material is configured to use the generated channel coordinates.
 
-# 
+The user should not need to manually discover that:
 
-# \---
+Use Channel Coordinates
 
-# 
+must be enabled after a successful compatible bake.
 
-# \# Output Naming
+Do not enable unsupported shader properties blindly.
 
-# 
+Validate property existence before changing material state.
 
-# Generate a predictable default output name.
+Preserve the uniform-flow fallback.
 
-# 
+---
 
-# Suggested format:
+# Obstacles
 
-# 
+Do not automatically treat arbitrary scene colliders as water obstacles.
 
-# T\_FlowMap\_<WaterObjectName>
+Preserve the SPEC-011 filtering system.
 
-# 
+Auto Setup may preserve:
 
-# Sanitize invalid characters.
+- Obstacle LayerMask;
+- Explicit Obstacles.
 
-# 
+If boundary/obstacle processing is enabled but no obstacle source is configured, provide a clear informational warning rather than implying obstacle avoidance is fully configured.
 
-# Do not overwrite unrelated generated assets with conflicting names.
+---
 
-# 
+# Preserve Manual Work
 
-# Continue using the existing generated WaterShader folders.
+Auto Setup must not silently destroy intentional manual authoring.
 
-# 
+Use:
 
-# \---
+- per-feature toggles;
+- clear replacement behavior;
+- Unity Undo.
 
-# 
+This especially applies to:
 
-# \# Mesh Source
+- centerline;
+- boundary;
+- Flow Coordinate Scale;
+- Steering Distance.
 
-# 
+---
 
-# Use the original water mesh as the geometric source for Auto Setup.
+# Re-run Behavior
 
-# 
+Auto Setup must remain safe to run again after:
 
-# Do not modify the imported/source mesh.
+- editing the source mesh;
+- changing object scale;
+- changing object rotation;
+- changing proportions.
 
-# 
+Re-running relevant automatic options should respond to the new Transform.
 
-# Any mesh modifications required by the existing flow-coordinate or obstacle systems must continue to occur only on generated copies.
+Do not create uncontrolled duplicate assets.
 
-# 
+Keep:
 
-# \---
+Auto Setup
 
-# 
+and:
 
-# \# Automatic Bake Bounds
+Bake And Assign
 
-# 
+conceptually separate.
 
-# Determine the water footprint from the mesh in the baker's local XZ space.
+---
 
-# 
+# Validation — Transform Equivalence
 
-# Calculate:
+Add a dedicated validation for Transform awareness.
 
-# 
+Create two visually equivalent water surfaces:
 
-# \- minimum X;
+## Case A
 
-# \- maximum X;
+Mesh modeled at approximately final dimensions.
 
-# \- minimum Z;
+Transform Scale:
 
-# \- maximum Z.
+(1, 1, 1)
 
-# 
+## Case B
 
-# Use these values to derive:
+Same or equivalent source mesh using a substantially non-uniform Transform scale.
 
-# 
+Example conceptually:
 
-# Bake Center
+X much larger than Z.
 
-# 
+Run Auto Setup on both.
 
-# and:
+They do not need identical serialized numbers because their local coordinate systems differ.
 
-# 
+They should, however, produce comparable visual results after Bake.
 
-# Bake Size
+Compare:
 
-# 
+- pattern thickness;
+- pattern density;
+- apparent longitudinal movement;
+- obstacle steering reach;
+- bake detail.
 
-# Add a small configurable or internally sensible padding so edge samples are not clipped.
+The non-uniformly scaled object must not produce noticeably thinner or compressed streaks simply because its source mesh was authored at another size.
 
-# 
+---
 
-# The automatic bounds should closely encompass the actual water surface.
+# Validation — Scale Change
 
-# 
+On an already configured test surface:
 
-# Do not assume the mesh is centered at the object's origin.
+1. run Auto Setup;
+2. record generated settings;
+3. change X/Z Transform scale substantially;
+4. run Auto Setup again.
 
-# 
+Verify that Transform-dependent estimates respond appropriately.
 
-# \---
+Local authoring data should remain internally coherent.
 
-# 
+Physical/visual settings should adapt.
 
-# \# Automatic Resolution
+---
 
-# 
+# Validation — Channel Coordinate Integration
 
-# Select a sensible bake resolution based on physical water size and desired spatial detail.
+Perform Auto Setup followed by Bake And Assign on a fresh supported water mesh.
 
-# 
+Without manually changing the material afterward:
 
-# The result must use the baker's existing supported resolution levels.
+- Flow Map should be active;
+- generated channel coordinates should be used when available;
+- animation should move continuously;
+- it should not fall back unexpectedly to the compatibility Flow Map path.
 
-# 
+---
 
-# For example:
+# Existing Validation Cases
 
-# 
+Continue validating:
 
-# 128
+- straight river;
+- curved/S-shaped river;
+- river with obstacle;
+- widening water/basin.
 
-# 256
+Also verify that the validated SPEC-011 obstacle behavior does not regress.
 
-# 512
+---
 
-# 1024
+# Difficult / Unsupported Geometry
 
-# 
+Warn rather than guess when encountering:
 
-# Do not simply assign one fixed resolution to every water surface.
+- disconnected surfaces;
+- meaningful branching;
+- highly non-manifold topology;
+- ambiguous centerline;
+- insufficient geometry.
 
-# 
+Automatic setup should provide a good editable starting point, not solve arbitrary river topology.
 
-# Prefer an approach based on approximate world/local cell size or another geometry-aware heuristic.
+---
 
-# 
+# Diagnostics
 
-# The selected value remains artist-editable after setup.
+After Auto Setup, report useful inferred information.
 
-# 
+Suggested information:
 
-# Avoid choosing 1024 unnecessarily.
+- source mesh;
+- Transform scale;
+- whether non-uniform scale was detected;
+- local bake bounds;
+- estimated physical dimensions;
+- boundary point count;
+- centerline point count;
+- chosen resolution;
+- Flow Coordinate Scale;
+- Steering Distance;
+- whether channel-coordinate material mode will be used.
 
-# 
+Warnings should clearly identify any setting left for manual configuration.
 
-# \---
+---
 
-# 
+# Acceptance Criteria
 
-# \# Boundary Extraction
+SPEC-011.5 is complete when:
 
-# 
+- Auto Setup From Mesh exists;
+- target references are detected;
+- source mesh is preserved;
+- local Bake Bounds fit the mesh;
+- Boundary and Centerline are generated for supported geometry;
+- Reverse Flow Direction works;
+- resolution considers actual spatial size;
+- Flow Coordinate World Scale behaves sensibly under non-uniform Transform scale;
+- Steering Distance behaves sensibly under non-uniform Transform scale;
+- equivalent world-space water surfaces produce broadly comparable visual pattern scale regardless of source-mesh Transform scale;
+- Bake And Assign automatically enables compatible channel-coordinate usage when appropriate;
+- Transform changes can be handled by rerunning Auto Setup;
+- artist-tuned settings remain editable;
+- Undo works;
+- obstacle steering from SPEC-011 remains functional;
+- unsupported geometry produces useful warnings instead of silent failure.
 
-# Attempt to generate the valid water boundary directly from the mesh footprint.
+---
 
-# 
+# Out of Scope
 
-# A suitable approach may inspect:
+Do not implement:
 
-# 
-
-# \- mesh topology;
-
-# \- boundary edges;
-
-# \- projected XZ geometry;
-
-# \- another robust footprint representation.
-
-# 
-
-# The implementation method is not prescribed.
-
-# 
-
-# The important result is an editable polygon representing the water surface.
-
-# 
-
-# When successful:
-
-# 
-
-# Boundary Mode should become:
-
-# 
-
-# Explicit Polygon
-
-# 
-
-# and Boundary Points should describe the water region.
-
-# 
-
-# \---
-
-# 
-
-# \# Boundary Loops
-
-# 
-
-# Meshes may contain:
-
-# 
-
-# \- one external boundary;
-
-# \- holes;
-
-# \- islands;
-
-# \- disconnected pieces;
-
-# \- unusual topology.
-
-# 
-
-# The system does not need to perfectly support every arbitrary mesh.
-
-# 
-
-# For the initial version, prioritize ordinary single-channel / single-surface water meshes.
-
-# 
-
-# If multiple ambiguous boundary loops are detected:
-
-# 
-
-# \- choose a safe behavior;
-
-# \- report the ambiguity;
-
-# \- do not silently produce a clearly incorrect boundary.
-
-# 
-
-# If useful, the largest outer loop may be selected as the primary boundary.
-
-# 
-
-# Document any limitations.
-
-# 
-
-# \---
-
-# 
-
-# \# Boundary Simplification
-
-# 
-
-# Do not expose hundreds of boundary points when the mesh contains dense topology.
-
-# 
-
-# Simplify the extracted boundary while preserving its significant shape.
-
-# 
-
-# Use enough points to represent:
-
-# 
-
-# \- bends;
-
-# \- river width;
-
-# \- basin shape;
-
-# 
-
-# without reproducing every triangle edge.
-
-# 
-
-# The resulting points must remain manually editable.
-
-# 
-
-# \---
-
-# 
-
-# \# Automatic Centerline
-
-# 
-
-# Attempt to generate an initial centerline from the water footprint.
-
-# 
-
-# The centerline should broadly follow the geometric middle of the water shape.
-
-# 
-
-# It should work particularly well for:
-
-# 
-
-# \- straight rivers;
-
-# \- curved rivers;
-
-# \- S-shaped channels;
-
-# \- river sections widening toward a basin.
-
-# 
-
-# Do not simply use the longest world axis if that would ignore the actual channel shape.
-
-# 
-
-# \---
-
-# 
-
-# \# Centerline Generation Freedom
-
-# 
-
-# The implementation is free to choose an appropriate Editor-time approach.
-
-# 
-
-# Possible techniques include:
-
-# 
-
-# \- medial-axis approximation;
-
-# \- distance-to-boundary ridge analysis;
-
-# \- sampled channel centers;
-
-# \- skeletonization;
-
-# \- graph-based footprint analysis;
-
-# \- another lightweight geometric approach.
-
-# 
-
-# These are suggestions, not requirements.
-
-# 
-
-# Choose the simplest robust method for this project.
-
-# 
-
-# The centerline output matters more than the exact algorithm.
-
-# 
-
-# \---
-
-# 
-
-# \# Centerline Quality
-
-# 
-
-# The generated path should:
-
-# 
-
-# \- remain inside the valid water boundary;
-
-# \- approximately follow the visual center of the channel;
-
-# \- avoid unnecessary oscillations;
-
-# \- preserve major bends;
-
-# \- provide a useful downstream path for SPEC-010/011;
-
-# \- use a manageable number of control points.
-
-# 
-
-# After generation, simplify the path into editable Control Points.
-
-# 
-
-# Do not create hundreds of control points.
-
-# 
-
-# Prefer a compact representation that the existing continuous curve system can smooth.
-
-# 
-
-# \---
-
-# 
-
-# \# Path Simplification
-
-# 
-
-# Reduce the automatically generated path to a practical number of control points.
-
-# 
-
-# Preserve meaningful:
-
-# 
-
-# \- bends;
-
-# \- entry direction;
-
-# \- exit direction;
-
-# \- broad structural changes.
-
-# 
-
-# Remove small geometric noise.
-
-# 
-
-# The exact simplification algorithm is not prescribed.
-
-# 
-
-# \---
-
-# 
-
-# \# Flow Direction Ambiguity
-
-# 
-
-# Mesh geometry may determine the centerline but not necessarily which end is upstream.
-
-# 
-
-# Auto Setup may choose either end using a reasonable deterministic rule.
-
-# 
-
-# The user must have an easy way to correct the direction.
-
-# 
-
-# Provide:
-
-# 
-
-# Reverse Flow Direction
-
-# 
-
-# This action should reverse the current centerline/control-point order without rebuilding the entire setup.
-
-# 
-
-# The result must immediately be visible in the Scene View path preview.
-
-# 
-
-# \---
-
-# 
-
-# \# Flow Coordinate Scale
-
-# 
-
-# Attempt to estimate useful initial Flow Coordinate World Scale values from the generated geometry.
-
-# 
-
-# Possible useful inputs include:
-
-# 
-
-# \- centerline length;
-
-# \- average channel width;
-
-# \- mesh dimensions.
-
-# 
-
-# This is an artistic parameter as well as a geometric one.
-
-# 
-
-# Therefore:
-
-# 
-
-# \- use conservative defaults;
-
-# \- do not aggressively overwrite manually tuned values on every Auto Setup;
-
-# \- keep the result editable.
-
-# 
-
-# If reliable automatic estimation is not possible, preserve the current validated default rather than inventing unstable values.
-
-# 
-
-# \---
-
-# 
-
-# \# Steering Distance
-
-# 
-
-# Estimate a useful initial Steering Distance based on the scale of the water geometry.
-
-# 
-
-# Possible inputs include:
-
-# 
-
-# \- average channel width;
-
-# \- median distance to boundary;
-
-# \- mesh scale.
-
-# 
-
-# This value remains artist-editable.
-
-# 
-
-# Do not attempt to automatically determine final Steering Strength unless a clearly reliable default exists.
-
-# 
-
-# Steering Strength may remain primarily artistic.
-
-# 
-
-# \---
-
-# 
-
-# \# Obstacle Setup
-
-# 
-
-# Do not automatically treat every collider in the scene as an obstacle.
-
-# 
-
-# Preserve the SPEC-011 filtering model.
-
-# 
-
-# Auto Setup may:
-
-# 
-
-# \- preserve an existing Obstacle LayerMask;
-
-# \- optionally apply a known project default if explicitly configured.
-
-# 
-
-# Do not scan arbitrary scene colliders and populate them without user intent.
-
-# 
-
-# \---
-
-# 
-
-# \# Auto Setup Options
-
-# 
-
-# If useful, expose individual toggles such as:
-
-# 
-
-# \- Fit Bake Bounds
-
-# \- Extract Boundary
-
-# \- Generate Centerline
-
-# \- Choose Resolution
-
-# \- Estimate Flow Coordinates
-
-# \- Estimate Steering Distance
-
-# 
-
-# The exact UI may vary.
-
-# 
-
-# A single default Auto Setup action should configure the recommended set.
-
-# 
-
-# Advanced users may disable individual operations.
-
-# 
-
-# \---
-
-# 
-
-# \# Preserve Manual Work
-
-# 
-
-# Auto Setup must not unexpectedly destroy deliberate manual authoring.
-
-# 
-
-# If the baker already contains a manually edited:
-
-# 
-
-# \- centerline;
-
-# \- boundary;
-
-# \- flow scale;
-
-# 
-
-# the tool should either:
-
-# 
-
-# \- clearly indicate that Auto Setup will replace those values;
-
-# \- provide per-feature toggles;
-
-# \- or use Undo so the entire operation can be reverted.
-
-# 
-
-# Unity Undo support is required for authoring changes.
-
-# 
-
-# \---
-
-# 
-
-# \# Re-run Behavior
-
-# 
-
-# Auto Setup should be safe to run again after the water mesh changes.
-
-# 
-
-# Re-running may recalculate:
-
-# 
-
-# \- bounds;
-
-# \- boundary;
-
-# \- centerline;
-
-# \- resolution;
-
-# \- estimated values.
-
-# 
-
-# Do not create uncontrolled duplicate assets.
-
-# 
-
-# Auto Setup itself should not need to Bake unless explicitly designed as an optional combined action.
-
-# 
-
-# Keep:
-
-# 
-
-# Auto Setup
-
-# 
-
-# and:
-
-# 
-
-# Bake And Assign Flow Map
-
-# 
-
-# conceptually separate.
-
-# 
-
-# \---
-
-# 
-
-# \# Scene View Feedback
-
-# 
-
-# After Auto Setup, the Scene View should immediately show:
-
-# 
-
-# \- bake bounds;
-
-# \- extracted boundary;
-
-# \- centerline;
-
-# \- control points;
-
-# \- direction arrows.
-
-# 
-
-# The user should be able to visually answer:
-
-# 
-
-# "Did the tool understand this water mesh correctly?"
-
-# 
-
-# without first entering Play Mode.
-
-# 
-
-# \---
-
-# 
-
-# \# Validation Case A — Straight River
-
-# 
-
-# Use a simple straight water mesh.
-
-# 
-
-# Auto Setup should produce:
-
-# 
-
-# \- fitted bounds;
-
-# \- correct boundary;
-
-# \- centerline through the channel;
-
-# \- sensible resolution;
-
-# \- valid downstream path.
-
-# 
-
-# Reverse Flow Direction must work.
-
-# 
-
-# \---
-
-# 
-
-# \# Validation Case B — Curved River
-
-# 
-
-# Use the current curved technical river.
-
-# 
-
-# Auto Setup should generate a centerline that follows the major S-shaped bend.
-
-# 
-
-# It must not collapse to a straight line between the mesh extremes.
-
-# 
-
-# Validate:
-
-# 
-
-# \- boundary;
-
-# \- centerline;
-
-# \- bounds;
-
-# \- generated flow after Bake.
-
-# 
-
-# The final flow should remain visually comparable to the manually configured SPEC-011 setup.
-
-# 
-
-# \---
-
-# 
-
-# \# Validation Case C — River With Obstacle
-
-# 
-
-# Use the validated cylinder-obstacle setup.
-
-# 
-
-# Auto Setup should configure the underlying water geometry without breaking obstacle steering.
-
-# 
-
-# After Bake:
-
-# 
-
-# \- the river path should remain valid;
-
-# \- the obstacle should still be avoided;
-
-# \- the generated pattern should remain coherent.
-
-# 
-
-# The auto-generated centerline does not need to route around the obstacle itself.
-
-# 
-
-# SPEC-011 obstacle steering remains responsible for local obstacle avoidance.
-
-# 
-
-# \---
-
-# 
-
-# \# Validation Case D — Wider Water / Basin
-
-# 
-
-# Use a mesh containing a narrow section opening into a wider region.
-
-# 
-
-# Auto Setup should still generate:
-
-# 
-
-# \- valid bounds;
-
-# \- usable boundary;
-
-# \- a reasonable centerline.
-
-# 
-
-# Do not implement automatic Flow Strength changes yet.
-
-# 
-
-# That belongs to SPEC-012.
-
-# 
-
-# \---
-
-# 
-
-# \# Difficult / Unsupported Geometry
-
-# 
-
-# Detect or warn when the geometry is outside the reliable scope of automatic setup.
-
-# 
-
-# Examples:
-
-# 
-
-# \- multiple disconnected water surfaces;
-
-# \- strong river branching;
-
-# \- highly non-manifold water meshes;
-
-# \- ambiguous centerline topology;
-
-# \- insufficient mesh data.
-
-# 
-
-# Do not silently create nonsense.
-
-# 
-
-# When automatic centerline generation is unreliable:
-
-# 
-
-# preserve all other successful Auto Setup results and request manual path editing.
-
-# 
-
-# \---
-
-# 
-
-# \# Branching Water
-
-# 
-
-# A single centerline is not sufficient to fully represent a branching river network.
-
-# 
-
-# If the footprint contains meaningful branches:
-
-# 
-
-# \- detect this where practical;
-
-# \- warn the user;
-
-# \- avoid pretending a single automatically generated path represents all branches correctly.
-
-# 
-
-# Do not implement multi-branch flow architecture in this Spec.
-
-# 
-
-# \---
-
-# 
-
-# \# Diagnostics
-
-# 
-
-# After Auto Setup, provide a short summary.
-
-# 
-
-# Example:
-
-# 
-
-# Auto Setup:
-
-# Renderer: found
-
-# Bounds: fitted
-
-# Boundary: 18 points
-
-# Centerline: 7 control points
-
-# Resolution: 256
-
-# Flow Scale: estimated
-
-# Steering Distance: estimated
-
-# 
-
-# Warnings:
-
-# Centerline direction is inferred. Use Reverse Flow Direction if necessary.
-
-# 
-
-# Exact wording may vary.
-
-# 
-
-# \---
-
-# 
-
-# \# Performance
-
-# 
-
-# All analysis occurs in the Editor.
-
-# 
-
-# Auto Setup may perform moderate geometry processing.
-
-# 
-
-# It does not need to run every frame.
-
-# 
-
-# Prioritize:
-
-# 
-
-# 1\. useful output;
-
-# 2\. predictable behavior;
-
-# 3\. reasonable Editor iteration time.
-
-# 
-
-# Avoid heavyweight processing when a simpler solution provides a good authoring starting point.
-
-# 
-
-# \---
-
-# 
-
-# \# External Assets
-
-# 
-
-# No external textures or art assets are required.
-
-# 
-
-# No manually authored Flow Map is required.
-
-# 
-
-# The system derives setup information from the existing water mesh and scene configuration.
-
-# 
-
-# \---
-
-# 
-
-# \# Acceptance Criteria
-
-# 
-
-# SPEC-011.5 is complete when:
-
-# 
-
-# \- Auto Setup From Mesh exists;
-
-# \- Renderer and Material can be configured automatically;
-
-# \- Bake bounds fit the water mesh;
-
-# \- an appropriate bake resolution is selected automatically;
-
-# \- the water boundary can be generated from a typical water mesh;
-
-# \- a useful initial centerline can be generated for straight and curved non-branching channels;
-
-# \- generated paths use a manageable number of editable points;
-
-# \- Reverse Flow Direction works;
-
-# \- automatic estimates remain manually editable;
-
-# \- Auto Setup can be undone;
-
-# \- rerunning setup does not create uncontrolled assets;
-
-# \- Scene View clearly previews the generated setup;
-
-# \- existing SPEC-010/011 flow behavior remains functional;
-
-# \- unsupported/ambiguous geometry produces useful warnings rather than silent failure.
-
-# 
-
-# \---
-
-# 
-
-# \# Out of Scope
-
-# 
-
-# Do not implement:
-
-# 
-
-# \- automatic multi-branch river flow;
-
-# \- runtime mesh analysis;
-
-# \- runtime Auto Setup;
-
-# \- runtime rebaking;
-
-# \- automatic river-to-lake Flow Strength;
-
-# \- SPEC-012 behavior;
-
-# \- Flow Strength override zones;
-
-# \- terrain carving;
-
-# \- mesh generation;
-
-# \- fluid simulation;
-
-# \- foam;
-
-# \- waves;
-
-# \- normals;
-
-# \- reflection;
-
-# \- refraction;
-
-# \- VFX;
-
-# \- interaction.
-
+- automatic multi-branch river flow;
+- runtime mesh analysis;
+- runtime Auto Setup;
+- runtime rebaking;
+- automatic river-to-lake Flow Strength;
+- SPEC-012 behavior;
+- Flow Strength override zones;
+- terrain carving;
+- fluid simulation;
+- foam;
+- waves;
+- normals;
+- reflection;
+- refraction;
+- VFX;
+- interaction.

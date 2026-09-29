@@ -31,7 +31,8 @@ namespace Meganeura.Water
         [SerializeField] Vector2 bakeSize = new Vector2(22f, 11f);
         [SerializeField] BakeResolution resolution = BakeResolution.R256;
         [SerializeField] bool generateCompatibleFlowCoordinates = true;
-        [SerializeField] Vector2 flowCoordinateWorldScale = new Vector2(7.2f, 2.2f);
+        [SerializeField, Tooltip("Physical world-unit repeat scale along and across the generated channel chart.")]
+        Vector2 flowCoordinateWorldScale = new Vector2(7.2f, 2.2f);
 
         [Header("Continuous Centerline (local space)")]
         [SerializeField] List<Vector3> controlPoints = new List<Vector3>
@@ -56,7 +57,8 @@ namespace Meganeura.Water
         [SerializeField] List<Vector3> boundaryPoints = new List<Vector3>();
         [SerializeField] LayerMask obstacleLayers;
         [SerializeField] List<Collider> explicitObstacles = new List<Collider>();
-        [SerializeField, Min(.01f)] float steeringDistance = 1.1f;
+        [SerializeField, Min(.01f), Tooltip("Physical world-space reach of boundary and obstacle steering.")]
+        float steeringDistance = 1.1f;
         [SerializeField, Range(0f, 2f)] float steeringStrength = .9f;
 
         [Header("Diagnostics")]

@@ -58,6 +58,15 @@ namespace Meganeura.Water.Editor
             public bool ambiguousCenterline;
         }
 
+        struct PhysicalMetrics
+        {
+            public float pathLength;
+            public float averageWidth;
+            public Vector2 boundsSize;
+            public Vector2 axisScale;
+            public bool nonUniformScale;
+        }
+
         public static void Run(StylizedWaterFlowBaker baker)
         {
             if (baker == null) throw new ArgumentNullException(nameof(baker));
@@ -98,11 +107,15 @@ namespace Meganeura.Water.Editor
             baker.OutputName = outputName;
 
             Vector2 dimensions = analysis.max - analysis.min;
-            float padding = Mathf.Max(.05f, Mathf.Max(dimensions.x, dimensions.y) * .015f);
+            float scaleX = Mathf.Max(1e-5f, baker.transform.TransformVector(Vector3.right).magnitude);
+            float scaleZ = Mathf.Max(1e-5f, baker.transform.TransformVector(Vector3.forward).magnitude);
+            float longestPhysical = Mathf.Max(dimensions.x * scaleX, dimensions.y * scaleZ);
+            float worldPadding = Mathf.Max(.05f, longestPhysical * .015f);
+            Vector2 localPadding = new Vector2(worldPadding / scaleX, worldPadding / scaleZ);
             if (baker.AutoFitBakeBounds)
             {
                 baker.BakeCenter = (analysis.min + analysis.max) * .5f;
-                baker.BakeSize = dimensions + Vector2.one * (padding * 2f);
+                baker.BakeSize = dimensions + localPadding * 2f;
             }
 
             if (baker.AutoExtractBoundary && analysis.boundary != null && analysis.boundary.Count >= 3)
@@ -130,25 +143,32 @@ namespace Meganeura.Water.Editor
                 }
             }
 
+            PhysicalMetrics physical = MeasurePhysicalMetrics(baker, analysis, dimensions, centerlineApplied);
+
             if (baker.AutoChooseResolution)
-                baker.Resolution = ChooseResolution(baker, dimensions);
+                baker.Resolution = ChooseResolution(physical.boundsSize);
 
             if (baker.AutoEstimateFlowCoordinates && centerlineApplied)
             {
-                float along = Mathf.Max(1f, analysis.pathLength / 3.25f);
-                float across = Mathf.Max(.35f, analysis.averageWidth * .4f);
+                float along = Mathf.Max(1f, physical.pathLength / 3.25f);
+                float across = Mathf.Max(.35f, physical.averageWidth * .4f);
                 baker.FlowCoordinateWorldScale = new Vector2(along, across);
             }
 
-            if (baker.AutoEstimateSteeringDistance && analysis.averageWidth > .01f)
-                baker.SteeringDistance = Mathf.Clamp(analysis.averageWidth * .35f, .2f, Mathf.Max(.3f, analysis.averageWidth * .6f));
+            if (baker.AutoEstimateSteeringDistance && physical.averageWidth > .01f)
+                baker.SteeringDistance = Mathf.Clamp(physical.averageWidth * .35f, .2f, Mathf.Max(.3f, physical.averageWidth * .6f));
 
             warnings.Add("Centerline direction is inferred deterministically. Use Reverse Flow Direction if the arrows point upstream.");
+            if (baker.UseBoundaryAndObstacles && baker.ObstacleLayers.value == 0 && baker.ExplicitObstacles.Count == 0)
+                warnings.Add("Boundary steering is configured, but no obstacle LayerMask or Explicit Obstacles are selected.");
             string summary = "Auto Setup From Mesh\n" +
                 $"Renderer: {renderer.name}; source: {mesh.name}\n" +
-                $"Bounds: {baker.BakeSize.x:F2} x {baker.BakeSize.y:F2} at ({baker.BakeCenter.x:F2}, {baker.BakeCenter.y:F2})\n" +
+                $"Transform scale: {physical.axisScale.x:F3} x {physical.axisScale.y:F3} (local X/Z); non-uniform: {(physical.nonUniformScale ? "yes" : "no")}\n" +
+                $"Local bounds: {baker.BakeSize.x:F2} x {baker.BakeSize.y:F2} at ({baker.BakeCenter.x:F2}, {baker.BakeCenter.y:F2}); physical: {physical.boundsSize.x:F2} x {physical.boundsSize.y:F2}\n" +
+                $"Physical path: {physical.pathLength:F2}; average width: {physical.averageWidth:F2}\n" +
                 $"Boundary: {(analysis.boundary == null ? 0 : analysis.boundary.Count)} points; Centerline: {(centerlineApplied ? analysis.centerline.Count : baker.ControlPoints.Count)} points\n" +
-                $"Resolution: {(int)baker.Resolution}; Flow Scale: {baker.FlowCoordinateWorldScale.x:F2}, {baker.FlowCoordinateWorldScale.y:F2}; Steering Distance: {baker.SteeringDistance:F2}";
+                $"Resolution: {(int)baker.Resolution}; Flow World Scale: {baker.FlowCoordinateWorldScale.x:F2}, {baker.FlowCoordinateWorldScale.y:F2}; Steering Distance: {baker.SteeringDistance:F2}\n" +
+                $"Channel coordinates after compatible Bake: {(baker.GenerateCompatibleFlowCoordinates ? "enabled on supported materials" : "not generated")}";
             if (warnings.Count > 0) summary += "\nWarnings:\n- " + string.Join("\n- ", warnings.ToArray());
             baker.SetAutoSetupResult(summary, warnings.Count > 1 || analysis.ambiguousCenterline);
             EditorUtility.SetDirty(baker);
@@ -507,10 +527,59 @@ namespace Meganeura.Water.Editor
             return false;
         }
 
-        static StylizedWaterFlowBaker.BakeResolution ChooseResolution(StylizedWaterFlowBaker baker, Vector2 localSize)
+        static PhysicalMetrics MeasurePhysicalMetrics(StylizedWaterFlowBaker baker, Analysis analysis, Vector2 localBoundsSize, bool centerlineApplied)
         {
-            Vector3 scale = baker.transform.lossyScale;
-            float longestWorld = Mathf.Max(localSize.x * Mathf.Abs(scale.x), localSize.y * Mathf.Abs(scale.z));
+            Transform transform = baker.transform;
+            Vector3 worldX = transform.TransformVector(Vector3.right);
+            Vector3 worldZ = transform.TransformVector(Vector3.forward);
+            var metrics = new PhysicalMetrics
+            {
+                axisScale = new Vector2(worldX.magnitude, worldZ.magnitude),
+                boundsSize = new Vector2(
+                    transform.TransformVector(new Vector3(localBoundsSize.x, 0f, 0f)).magnitude,
+                    transform.TransformVector(new Vector3(0f, 0f, localBoundsSize.y)).magnitude)
+            };
+            float largestScale = Mathf.Max(metrics.axisScale.x, metrics.axisScale.y);
+            metrics.nonUniformScale = largestScale > 1e-5f &&
+                Mathf.Abs(metrics.axisScale.x - metrics.axisScale.y) / largestScale > .01f;
+
+            if (!centerlineApplied || analysis.boundary == null || analysis.boundary.Count < 3)
+                return metrics;
+
+            const int sampleCount = 257;
+            Vector3 previous = transform.TransformPoint(baker.EvaluateLocal(0f));
+            float widthSum = 0f;
+            int widthSamples = 0;
+            for (int i = 0; i < sampleCount; i++)
+            {
+                float t = i / (sampleCount - 1f);
+                Vector3 local = baker.EvaluateLocal(t);
+                Vector3 world = transform.TransformPoint(local);
+                if (i > 0) metrics.pathLength += Vector3.Distance(previous, world);
+                previous = world;
+
+                float nearest = float.MaxValue;
+                for (int edge = 0; edge < analysis.boundary.Count; edge++)
+                {
+                    Vector2 a2 = analysis.boundary[edge];
+                    Vector2 b2 = analysis.boundary[(edge + 1) % analysis.boundary.Count];
+                    Vector3 a = transform.TransformPoint(new Vector3(a2.x, analysis.meanY, a2.y));
+                    Vector3 b = transform.TransformPoint(new Vector3(b2.x, analysis.meanY, b2.y));
+                    nearest = Mathf.Min(nearest, DistanceToSegment(world, a, b));
+                }
+                if (nearest < float.MaxValue)
+                {
+                    widthSum += nearest * 2f;
+                    widthSamples++;
+                }
+            }
+            metrics.averageWidth = widthSamples > 0 ? widthSum / widthSamples : 0f;
+            return metrics;
+        }
+
+        static StylizedWaterFlowBaker.BakeResolution ChooseResolution(Vector2 physicalSize)
+        {
+            float longestWorld = Mathf.Max(physicalSize.x, physicalSize.y);
             if (longestWorld <= 14f) return StylizedWaterFlowBaker.BakeResolution.R128;
             if (longestWorld <= 36f) return StylizedWaterFlowBaker.BakeResolution.R256;
             if (longestWorld <= 90f) return StylizedWaterFlowBaker.BakeResolution.R512;
@@ -590,6 +659,12 @@ namespace Meganeura.Water.Editor
         {
             Vector2 d = b - a; float t = d.sqrMagnitude > 1e-12f ? Mathf.Clamp01(Vector2.Dot(point - a, d) / d.sqrMagnitude) : 0f;
             return Vector2.Distance(point, a + d * t);
+        }
+
+        static float DistanceToSegment(Vector3 point, Vector3 a, Vector3 b)
+        {
+            Vector3 d = b - a; float t = d.sqrMagnitude > 1e-12f ? Mathf.Clamp01(Vector3.Dot(point - a, d) / d.sqrMagnitude) : 0f;
+            return Vector3.Distance(point, a + d * t);
         }
 
         static float SignedArea(List<Vector2> points)

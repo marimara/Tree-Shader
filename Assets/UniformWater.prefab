@@ -1,0 +1,189 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &3834203156731624958
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5637566487894842780}
+  - component: {fileID: 2282058408667732622}
+  - component: {fileID: 1046062746065470071}
+  - component: {fileID: 4280925154707921526}
+  - component: {fileID: 1777321036438923848}
+  m_Layer: 0
+  m_Name: UniformWater
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5637566487894842780
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3834203156731624958}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -3.2, y: 0.04, z: 6}
+  m_LocalScale: {x: 0.72, y: 1, z: 0.22}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!33 &2282058408667732622
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3834203156731624958}
+  m_Mesh: {fileID: 4300000, guid: 384f6a6cb2496644287e8cb41cd1ec99, type: 2}
+--- !u!64 &1046062746065470071
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3834203156731624958}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: 10209, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!23 &4280925154707921526
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3834203156731624958}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: fcc2fe9cd2a11fd418cf0a210697d003, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 1
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &1777321036438923848
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3834203156731624958}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d6179ee45e538044f9050a626032bbe8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Meganeura.Water.StylizedWaterFlowBaker
+  targetRenderer: {fileID: 4280925154707921526}
+  targetMaterial: {fileID: 2100000, guid: fcc2fe9cd2a11fd418cf0a210697d003, type: 2}
+  sourceMesh: {fileID: 10209, guid: 0000000000000000e000000000000000, type: 0}
+  outputName: T_FlowMap_UniformWater
+  autoFitBakeBounds: 1
+  autoExtractBoundary: 1
+  autoGenerateCenterline: 1
+  autoChooseResolution: 1
+  autoEstimateFlowCoordinates: 1
+  autoEstimateSteeringDistance: 1
+  bakeCenter: {x: 0, y: 0}
+  bakeSize: {x: 10.3, y: 10.3}
+  resolution: 128
+  generateCompatibleFlowCoordinates: 1
+  flowCoordinateWorldScale: {x: 2.5, y: 2.3333333}
+  controlPoints:
+  - {x: -4.0625, y: 2.625102e-24, z: -0.10416651}
+  - {x: 0.10416666, y: 2.625102e-24, z: -0.10416651}
+  - {x: 4.0624995, y: 2.625102e-24, z: -0.10416651}
+  strengthMode: 0
+  constantStrength: 0.62
+  startStrength: 0.82
+  endStrength: 0.28
+  falloffStart: 0.55
+  useBoundaryAndObstacles: 1
+  boundaryMode: 1
+  boundaryPoints:
+  - {x: -5, y: 2.625102e-24, z: 5}
+  - {x: -5, y: 2.625102e-24, z: -5}
+  - {x: 5, y: 2.625102e-24, z: -5}
+  - {x: 5, y: 2.625102e-24, z: 5}
+  obstacleLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  explicitObstacles:
+  - {fileID: 0}
+  steeringDistance: 2.0416665
+  steeringStrength: 0.9
+  showPath: 1
+  showBounds: 1
+  showBoundary: 1
+  showDirectionArrows: 1
+  arrowCount: 14
+  bakedFlowMap: {fileID: 2800000, guid: 97fdf62d229839c42b7cafa5e610536c, type: 2}
+  bakeDiagnostics: {fileID: 2800000, guid: 3ec7d645954622f469d12f6cc6c2e592, type: 2}
+  generatedFlowMesh: {fileID: 4300000, guid: 384f6a6cb2496644287e8cb41cd1ec99, type: 2}
+  lastBakeSummary: 'Baked 128x128 RGBAFloat to Assets/WaterShader/Generated/FlowMaps/T_FlowMap_UniformWater.asset. Valid water: 14365; blocked: 1011; strength: Constant.'
+  lastAutoSetupSummary: 'Auto Setup From Mesh
+
+    Renderer: UniformWater; source: Plane
+
+    Bounds: 10,30 x 10,30 at (0,00, 0,00)
+
+    Boundary: 4 points; Centerline: 3 points
+
+    Resolution: 128; Flow Scale: 2,50, 2,33; Steering Distance: 2,04
+
+    Warnings:
+
+    - Centerline direction is inferred deterministically. Use Reverse Flow Direction if the arrows point upstream.'
+  lastAutoSetupHadWarnings: 0
