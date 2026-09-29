@@ -1446,7 +1446,6 @@ MonoBehaviour:
   - {x: -9.6875, y: 0, z: -4.5299997}
   - {x: -10, y: 0, z: -4.5299997}
   obstacleLayers:
-    serializedVersion: 2
     m_Bits: 0
   explicitObstacles:
   - {fileID: 884650400}
@@ -1836,7 +1835,6 @@ MonoBehaviour:
   - {x: 5, y: 2.625102e-24, z: -5}
   - {x: 5, y: 2.625102e-24, z: 5}
   obstacleLayers:
-    serializedVersion: 2
     m_Bits: 0
   explicitObstacles:
   - {fileID: 163130142}
@@ -2448,7 +2446,6 @@ MonoBehaviour:
   - {x: 5, y: 2.625102e-24, z: -5}
   - {x: 5, y: 2.625102e-24, z: 5}
   obstacleLayers:
-    serializedVersion: 2
     m_Bits: 0
   explicitObstacles: []
   steeringDistance: 0.79118675
@@ -2755,7 +2752,6 @@ MonoBehaviour:
   - {x: 5, y: 2.625102e-24, z: -5}
   - {x: 5, y: 2.625102e-24, z: 5}
   obstacleLayers:
-    serializedVersion: 2
     m_Bits: 0
   explicitObstacles:
   - {fileID: 826428003}
